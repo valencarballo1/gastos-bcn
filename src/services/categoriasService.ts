@@ -1,6 +1,6 @@
 import { CategoriaFormData, Categoria } from '../types';
 
-const API_BASE_URL = '/api/categorias';
+const API_BASE_URL = 'https://gastosApiBCN.somee.com/api/Categoria';
 
 export class CategoriasService {
   private static instance: CategoriasService;
@@ -13,7 +13,7 @@ export class CategoriasService {
   }
 
   async getCategorias(): Promise<Categoria[]> {
-    const res = await fetch(API_BASE_URL, { method: 'GET' });
+    const res = await fetch(`${API_BASE_URL}/get-categorias`, { method: 'GET' });
     if (!res.ok) throw new Error('Error al obtener categorías');
     const data = await res.json();
     return data.result ?? data; // Ajusta según tu ApiResponse<T>

@@ -1,6 +1,6 @@
 import { Gasto, GastoFormData } from '../types';
 
-const API_BASE_URL = '/api/gastos';
+const API_BASE_URL = 'https://gastosApiBCN.somee.com/api/Gastos';
 
 export class GastosService {
   private static instance: GastosService;

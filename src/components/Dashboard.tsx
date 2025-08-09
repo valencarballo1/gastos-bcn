@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Container, Row, Col, Card } from 'react-bootstrap';
 import { GastosList } from './GastosList';
 import { GastoForm } from './GastoForm';
@@ -19,11 +19,7 @@ export const Dashboard: React.FC = () => {
 
   const gastosService = GastosService.getInstance();
 
-  useEffect(() => {
-    loadGastos();
-  }, [refreshKey]);
-
-  const loadGastos = async () => {
+  const loadGastos = useCallback(async () => {
     try {
       const allGastos = await gastosService.getGastos();
       const ana = allGastos.filter(g => g.persona === 'Ana');
@@ -37,7 +33,11 @@ export const Dashboard: React.FC = () => {
     } catch (error) {
       console.error('Error cargando gastos desde API:', error);
     }
-  };
+  }, [gastosService]);
+
+  useEffect(() => {
+    loadGastos();
+  }, [loadGastos, refreshKey]);
 
   const handleGastoAdded = () => {
     setRefreshKey(prev => prev + 1);

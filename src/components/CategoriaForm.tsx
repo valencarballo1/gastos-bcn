@@ -49,12 +49,12 @@ export const CategoriaForm: React.FC<CategoriaFormProps> = ({ onCategoriaAdded }
     }
   };
 
-  const handleInputChange = (field: keyof CategoriaFormData, value: any) => {
-    setCategoriaFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  const handleInputChange = (field: keyof CategoriaFormData, value: string) => {
+  setCategoriaFormData(prev => ({
+    ...prev,
+    [field]: value
+  }));
+};
 
   return (
     <>

@@ -88,14 +88,13 @@ export const GastoForm: React.FC<GastoFormProps> = ({ onGastoAdded }) => {
     }
   };
 
-  const handleInputChange = (field: keyof GastoFormData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (field: keyof GastoFormData, value: string | number) => {
+  setFormData(prev => ({ ...prev, [field]: value }));
 
-    // Limpiar error del campo cuando el usuario empiece a escribir
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }));
-    }
-  };
+  if (errors[field]) {
+    setErrors(prev => ({ ...prev, [field]: '' }));
+  }
+};
 
   const handlePersonaChange = (persona: 'Ana' | 'Valen') => {
     handleInputChange('persona', persona);
