@@ -1,36 +1,135 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🌊 Gastos BCN - Control de Gastos Compartidos
 
-## Getting Started
+Una aplicación moderna y elegante para controlar gastos compartidos entre Ana y Valen, con un diseño inspirado en la playa, el mar y el sol.
 
-First, run the development server:
+## ✨ Características
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Gestión de Gastos**: Agregar gastos con monto, descripción, categoría y persona
+- **Separación por Persona**: Distinguir claramente entre gastos de Ana y Valen
+- **Categorías Personalizables**: Crear y personalizar categorías con colores únicos
+- **Vista Organizada**: Mostrar los últimos 5 gastos con opción de ver todos
+- **Diseño Responsivo**: Interfaz moderna que funciona en todos los dispositivos
+- **Tema Playero**: Colores inspirados en la playa, mar y sol
+
+## 🚀 Tecnologías Utilizadas
+
+- **Next.js 15** - Framework de React
+- **TypeScript** - Tipado estático
+- **Bootstrap 5** - Framework de CSS
+- **React Bootstrap** - Componentes de React para Bootstrap
+- **LocalStorage** - Almacenamiento local de datos
+
+## 📁 Estructura del Proyecto
+
+```
+src/
+├── app/                 # Páginas de Next.js
+├── components/          # Componentes React
+│   ├── Dashboard.tsx   # Componente principal
+│   ├── GastoForm.tsx   # Formulario de gastos
+│   ├── GastosList.tsx  # Lista de gastos
+│   └── CategoriaForm.tsx # Formulario de categorías
+├── services/            # Lógica de negocio
+│   └── gastosService.ts # Servicio de gastos
+├── types/               # Tipos TypeScript
+│   └── index.ts        # Interfaces y tipos
+└── utils/               # Utilidades
+    └── colors.ts       # Paleta de colores
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🎨 Paleta de Colores
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+La aplicación utiliza una paleta de colores inspirada en la playa:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Azul Oceánico** (#1e3a8a) - Para encabezados principales
+- **Azul Marino** (#3b82f6) - Para elementos secundarios
+- **Arena** (#fbbf24) - Para botones de acción
+- **Atardecer** (#f97316) - Para elementos destacados
+- **Coral** (#fb7185) - Para gastos de Ana
+- **Aqua** (#06b6d4) - Para gastos de Valen
 
-## Learn More
+## 🛠️ Instalación y Uso
 
-To learn more about Next.js, take a look at the following resources:
+1. **Clonar el repositorio**
+   ```bash
+   git clone [url-del-repositorio]
+   cd gastos-bcn
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. **Instalar dependencias**
+   ```bash
+   npm install
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. **Ejecutar en desarrollo**
+   ```bash
+   npm run dev
+   ```
 
-## Deploy on Vercel
+4. **Abrir en el navegador**
+   ```
+   http://localhost:3000
+   ```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📱 Funcionalidades Principales
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Agregar Gasto
+- Seleccionar persona (Ana o Valen)
+- Ingresar monto en euros
+- Agregar descripción
+- Seleccionar categoría existente
+
+### Crear Categoría
+- Nombre de la categoría
+- Descripción opcional
+- Selección de color personalizado
+
+### Visualización
+- **Gastos de Ana**: Lista de gastos de Ana con total
+- **Gastos de Valen**: Lista de gastos de Valen con total
+- **Gastos Totales**: Vista consolidada de todos los gastos
+
+## 🔧 Personalización
+
+### Agregar Nuevas Categorías
+La aplicación incluye categorías por defecto, pero puedes crear las tuyas propias:
+- Comida
+- Transporte
+- Entretenimiento
+- Compras
+
+### Modificar Colores
+Los colores se pueden personalizar editando `src/utils/colors.ts`
+
+## 📊 Almacenamiento de Datos
+
+Actualmente la aplicación utiliza localStorage para almacenar los datos. Esto significa que:
+- Los datos se guardan en el navegador
+- No se pierden al cerrar la aplicación
+- Son específicos de cada dispositivo
+
+## 🚀 Futuras Mejoras
+
+- [ ] Integración con base de datos
+- [ ] Autenticación de usuarios
+- [ ] Exportación de datos
+- [ ] Gráficos y estadísticas
+- [ ] Notificaciones
+- [ ] Modo oscuro
+
+## 🤝 Contribución
+
+Las contribuciones son bienvenidas. Por favor:
+1. Fork el proyecto
+2. Crea una rama para tu feature
+3. Commit tus cambios
+4. Push a la rama
+5. Abre un Pull Request
+
+## 📄 Licencia
+
+Este proyecto está bajo la Licencia MIT.
+
+---
+
+**Desarrollado con ❤️ para Ana y Valen**

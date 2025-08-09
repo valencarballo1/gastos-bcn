@@ -1,42 +1,267 @@
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
   }
 }
 
-html,
 body {
-  max-width: 100vw;
-  overflow-x: hidden;
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+    135deg,
+    #f8fafc 0%,
+    #e2e8f0 25%,
+    #cbd5e1 50%,
+    #94a3b8 75%,
+    #64748b 100%
+  );
+  min-height: 100vh;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+/* Estilos personalizados para la aplicación */
+.gasto-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+.color-option:hover {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
+/* Estilos para el formulario tipo Excel */
+.gasto-form-card {
+  transition: all 0.3s ease;
 }
 
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
+.gasto-form-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+}
+
+.persona-selector .persona-btn {
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.persona-selector .persona-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.3);
+}
+
+.persona-selector .persona-btn:active {
+  transform: translateY(0);
+}
+
+.persona-selector .persona-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s;
+}
+
+.persona-selector .persona-btn:hover::before {
+  left: 100%;
+}
+
+.excel-grid {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 24px;
+  border: 2px solid #e2e8f0;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.excel-input {
+  transition: all 0.3s ease;
+  border: 2px solid #e2e8f0 !important;
+}
+
+.excel-input:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.25) !important;
+  transform: translateY(-1px);
+}
+
+.excel-input:hover {
+  border-color: #94a3b8 !important;
+}
+
+.submit-btn {
+  transition: all 0.3s ease;
+}
+
+.submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(30, 58, 138, 0.4);
+}
+
+.submit-btn:active {
+  transform: translateY(0);
+}
+
+/* Estilos para los campos de formulario */
+.form-label {
+  font-size: 0.95rem;
+  letter-spacing: 0.025em;
+  margin-bottom: 8px;
+}
+
+.form-control, .form-select {
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.form-control:focus, .form-select:focus {
+  background-color: #ffffff;
+}
+
+/* Estilos para mensajes de error */
+.invalid-feedback {
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+/* Estilos para el mensaje de éxito */
+.alert-success {
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+}
+
+.alert-success .btn-close {
+  filter: invert(1);
+}
+
+/* Estilos para el InputGroup */
+.input-group-text {
+  font-weight: 600;
+  color: #475569;
+  transition: all 0.3s ease;
+}
+
+.input-group:focus-within .input-group-text {
+  background-color: #f1f5f9 !important;
+  border-color: #3b82f6 !important;
+  color: #1e3a8a;
+}
+
+/* Estilos para el textarea */
+textarea.form-control {
+  min-height: 80px;
+  line-height: 1.5;
+}
+
+/* Estilos para el select de categorías */
+.form-select {
+  cursor: pointer;
+}
+
+.form-select option {
+  padding: 8px 12px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .excel-grid {
+    padding: 16px;
   }
+  
+  .persona-selector .d-flex {
+    flex-direction: column;
+  }
+  
+  .persona-selector .persona-btn {
+    margin-bottom: 8px;
+  }
+  
+  .submit-btn {
+    width: 100%;
+    padding: 16px 24px;
+  }
+}
+
+/* Scrollbar personalizado */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #3b82f6 0%, #1e3a8a 100%);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%);
+}
+
+/* Animaciones adicionales */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.gasto-form-card {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+/* Estilos para el estado de carga */
+.spinner-border {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Estilos para el hover de los botones de persona */
+.persona-btn.btn-outline-primary:hover {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+.persona-btn.btn-outline-primary:not(:hover) {
+  color: #3b82f6;
+  border-color: #3b82f6;
+  background-color: transparent;
+}
+
+/* Estilos para el focus de los botones */
+.persona-btn:focus {
+  box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25);
+}
+
+/* Estilos para el estado disabled */
+.submit-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
 }
