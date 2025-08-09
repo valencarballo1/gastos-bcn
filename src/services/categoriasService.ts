@@ -1,6 +1,6 @@
 import { CategoriaFormData, Categoria } from '../types';
 
-const API_BASE_URL = 'https://gastosApiBCN.somee.com/api/Categoria';
+const API_BASE_URL = 'https://gastosApiBCN.somee.com/api/Categorias';
 
 export class CategoriasService {
   private static instance: CategoriasService;
