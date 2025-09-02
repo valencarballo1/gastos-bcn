@@ -65,29 +65,74 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
       const workbook = XLSX.read(data);
       const firstSheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[firstSheetName];
-      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null });
 
-      // Mapear columnas esperadas
-      const mapped: ParsedRow[] = json
-        .map((r: Record<string, unknown>) => {
-          const fechaOperacion = parseDate(
-            (r['Fecha operación'] as unknown) ?? (r['Fecha operacion'] as unknown) ?? (r['Fecha'] as unknown) ?? (r['FECHA'] as unknown) ?? (r['Fecha valor'] as unknown)
-          );
-          const concepto = (r['Concepto'] as unknown) ?? (r['CONCEPTO'] as unknown) ?? (r['Descripción'] as unknown) ?? (r['DESCRIPCION'] as unknown) ?? (r['Detalle'] as unknown) ?? (r['DETALLE'] as unknown) ?? '';
-          const importe = parseNumberEs(
-            (r['Importe'] as unknown) ?? (r['IMPORTE'] as unknown) ?? (r['Cargo'] as unknown) ?? (r['Importe (EUR)'] as unknown) ?? (r['Importe EUR'] as unknown)
-          );
-          const saldoCell = (r['Saldo'] as unknown) ?? (r['SALDO'] as unknown) ?? (r['Saldo (EUR)'] as unknown);
-          const saldo = saldoCell != null ? parseNumberEs(saldoCell) : null;
-          if (!fechaOperacion && !concepto && !importe) return null;
-          return {
-            fechaOperacion,
-            concepto: String((concepto as string) || ''),
-            importe: Number((importe as number) || 0),
-            saldo: saldo,
-          } as ParsedRow;
-        })
-        .filter(Boolean) as ParsedRow[];
+      // Leemos como matriz (AOA) para detectar la fila de encabezados real
+      const aoa = XLSX.utils.sheet_to_json<(string | number | null)[]>(sheet, { header: 1, defval: null });
+
+      const normalize = (v: unknown): string => {
+        if (typeof v !== 'string') return '';
+        return v
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
+
+      // Buscar la fila donde aparecen encabezados como "fecha operacion", "concepto", "importe"
+      let headerRowIdx = -1;
+      let headers: string[] = [];
+      for (let i = 0; i < Math.min(aoa.length, 50); i++) {
+        const row = aoa[i];
+        const norm = row.map(normalize);
+        const hasFecha = norm.some(c => c.includes('fecha operacion') || c.includes('fecha valor') || c === 'fecha');
+        const hasConcepto = norm.some(c => c.includes('concepto') || c.includes('descripcion') || c.includes('detalle'));
+        const hasImporte = norm.some(c => c.includes('importe') || c.includes('cargo'));
+        if (hasFecha && hasConcepto && hasImporte) {
+          headerRowIdx = i;
+          headers = row.map(v => (typeof v === 'string' ? v : '')) as string[];
+          break;
+        }
+      }
+
+      if (headerRowIdx === -1) {
+        const detectedKeys = aoa[0] ? aoa[0].map(x => (x ?? '')).join(', ') : '—';
+        setRows([]);
+        setFinalSaldo(null);
+        setError(`No se detectaron encabezados de movimientos. Revisa que existan columnas como Fecha operación, Concepto, Importe, Saldo. Columnas detectadas: ${detectedKeys}`);
+        return;
+      }
+
+      // Indices de columnas
+      const normHeaders = headers.map(normalize);
+      const findCol = (...candidates: string[]): number => {
+        return normHeaders.findIndex(h => candidates.some(c => h.includes(c)));
+      };
+      const idxFechaOp = findCol('fecha operacion', 'fecha');
+      const idxConcepto = findCol('concepto', 'descripcion', 'detalle');
+      const idxImporte = findCol('importe', 'cargo');
+      const idxSaldo = findCol('saldo');
+
+      const dataStart = headerRowIdx + 1;
+      const mapped: ParsedRow[] = [];
+      for (let r = dataStart; r < aoa.length; r++) {
+        const row = aoa[r];
+        if (!row || row.every(v => v == null || String(v).trim() === '')) continue;
+        const fechaOperacion = parseDate(idxFechaOp >= 0 ? (row[idxFechaOp] as unknown) : null);
+        const conceptoCell = idxConcepto >= 0 ? (row[idxConcepto] as unknown) : '';
+        const importeCell = idxImporte >= 0 ? (row[idxImporte] as unknown) : 0;
+        const saldoCell = idxSaldo >= 0 ? (row[idxSaldo] as unknown) : null;
+        const importe = parseNumberEs(importeCell);
+        const saldo = saldoCell != null ? parseNumberEs(saldoCell) : null;
+        // Si no hay concepto ni importe, skip
+        if (!conceptoCell && (!importe || importe === 0)) continue;
+        mapped.push({
+          fechaOperacion,
+          concepto: String(conceptoCell || ''),
+          importe: Number(importe || 0),
+          saldo,
+        });
+      }
 
       // Filtrar filas que realmente son movimientos (importe distinto de 0)
       const movimientos = mapped.filter(m => typeof m.importe === 'number' && m.importe !== 0);
@@ -110,8 +155,10 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
       setFinalSaldo(computedFinalSaldo);
 
       if (movimientos.length === 0) {
-        const detectedKeys = json[0] ? Object.keys(json[0]).join(', ') : '—';
-        setError(`No se detectaron movimientos. Revisa los nombres de columnas (ej.: Fecha operación, Concepto/Descripción, Importe, Saldo). Columnas detectadas: ${detectedKeys}`);
+        const showHeaders = headers.length ? headers.join(', ') : '—';
+        setError(`No se detectaron movimientos. Revisa los nombres de columnas (ej.: Fecha operación, Concepto/Descripción, Importe, Saldo). Encabezados detectados: ${showHeaders}`);
+      } else {
+        setError(null);
       }
     } catch (e) {
       setError('No se pudo leer el archivo. Asegúrate de seleccionar el Excel correcto.');
