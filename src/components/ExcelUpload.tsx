@@ -71,11 +71,13 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
       const mapped: ParsedRow[] = json
         .map((r: Record<string, unknown>) => {
           const fechaOperacion = parseDate(
-            (r['Fecha operación'] as unknown) ?? (r['Fecha operacion'] as unknown) ?? (r['Fecha'] as unknown) ?? (r['FECHA'] as unknown)
+            (r['Fecha operación'] as unknown) ?? (r['Fecha operacion'] as unknown) ?? (r['Fecha'] as unknown) ?? (r['FECHA'] as unknown) ?? (r['Fecha valor'] as unknown)
           );
-          const concepto = (r['Concepto'] as unknown) ?? (r['CONCEPTO'] as unknown) ?? '';
-          const importe = parseNumberEs((r['Importe'] as unknown) ?? (r['IMPORTE'] as unknown) ?? (r['Cargo'] as unknown));
-          const saldoCell = (r['Saldo'] as unknown) ?? (r['SALDO'] as unknown);
+          const concepto = (r['Concepto'] as unknown) ?? (r['CONCEPTO'] as unknown) ?? (r['Descripción'] as unknown) ?? (r['DESCRIPCION'] as unknown) ?? (r['Detalle'] as unknown) ?? (r['DETALLE'] as unknown) ?? '';
+          const importe = parseNumberEs(
+            (r['Importe'] as unknown) ?? (r['IMPORTE'] as unknown) ?? (r['Cargo'] as unknown) ?? (r['Importe (EUR)'] as unknown) ?? (r['Importe EUR'] as unknown)
+          );
+          const saldoCell = (r['Saldo'] as unknown) ?? (r['SALDO'] as unknown) ?? (r['Saldo (EUR)'] as unknown);
           const saldo = saldoCell != null ? parseNumberEs(saldoCell) : null;
           if (!fechaOperacion && !concepto && !importe) return null;
           return {
@@ -87,8 +89,8 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
         })
         .filter(Boolean) as ParsedRow[];
 
-      // Filtrar filas que realmente son movimientos (tienen fecha e importe)
-      const movimientos = mapped.filter(m => m.fechaOperacion && m.importe !== 0);
+      // Filtrar filas que realmente son movimientos (importe distinto de 0)
+      const movimientos = mapped.filter(m => typeof m.importe === 'number' && m.importe !== 0);
 
       // Ordenar por fecha asc para calcular saldo si no viene
       movimientos.sort((a, b) => {
@@ -106,6 +108,11 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
 
       setRows(movimientos);
       setFinalSaldo(computedFinalSaldo);
+
+      if (movimientos.length === 0) {
+        const detectedKeys = json[0] ? Object.keys(json[0]).join(', ') : '—';
+        setError(`No se detectaron movimientos. Revisa los nombres de columnas (ej.: Fecha operación, Concepto/Descripción, Importe, Saldo). Columnas detectadas: ${detectedKeys}`);
+      }
     } catch (e) {
       setError('No se pudo leer el archivo. Asegúrate de seleccionar el Excel correcto.');
       console.error(e);
