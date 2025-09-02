@@ -34,9 +34,19 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
   const formatEuro = (n: number) => n.toLocaleString("es-ES", { style: "currency", currency: "EUR" })
 
   const parseNumberEs = (value: unknown): number => {
-    if (typeof value === "number") return value
+    if (typeof value === "number") return value < 0 ? value : 0
     if (typeof value !== "string") return 0
-    const cleaned = value.replace(/\s/g, "").replace(/EUR/gi, "").replace(/\./g, "").replace(/,/g, ".")
+
+    const hasNegativeSign = value.includes("-") || value.includes("−")
+    if (!hasNegativeSign) return 0 // ❌ No es negativo → ignoramos
+
+    const cleaned = value
+      .replace(/\s/g, "")
+      .replace(/EUR/gi, "")
+      .replace(/\./g, "")
+      .replace(/,/g, ".")
+      .replace(/−/g, "-") // reemplaza signo menos especial
+
     const parsed = Number.parseFloat(cleaned)
     return isNaN(parsed) ? 0 : parsed
   }
