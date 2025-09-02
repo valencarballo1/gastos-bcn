@@ -79,39 +79,43 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
           .trim();
       };
 
-      // Buscar la fila donde aparecen encabezados como "fecha operacion", "concepto", "importe"
-      let headerRowIdx = -1;
-      let headers: string[] = [];
-      for (let i = 0; i < Math.min(aoa.length, 50); i++) {
-        const row = aoa[i];
-        const norm = row.map(normalize);
-        const hasFecha = norm.some(c => c.includes('fecha operacion') || c.includes('fecha valor') || c === 'fecha');
-        const hasConcepto = norm.some(c => c.includes('concepto') || c.includes('descripcion') || c.includes('detalle'));
-        const hasImporte = norm.some(c => c.includes('importe') || c.includes('cargo'));
-        if (hasFecha && hasConcepto && hasImporte) {
-          headerRowIdx = i;
-          headers = row.map(v => (typeof v === 'string' ? v : '')) as string[];
-          break;
+      // Santander: encabezados en fila 7 (index 6), datos desde fila 8
+      // Usamos este layout por defecto y retrocedemos a autodetección si no hay datos
+      let headerRowIdx = 6;
+      let headers: string[] = (aoa[headerRowIdx] || []).map(v => (typeof v === 'string' ? v : '')) as string[];
+      let idxFechaOp = 0; // Columna A
+      let idxConcepto = 2; // Columna C
+      let idxImporte = 3; // Columna D
+      let idxSaldo = 4; // Columna E
+
+      // Si esta suposición no funciona (no hay datos), hacemos autodetección como fallback
+      const autodetectIfNeeded = () => {
+        // Buscar la fila con encabezados plausibles
+        let found = -1;
+        let hdrs: string[] = [];
+        for (let i = 0; i < Math.min(aoa.length, 50); i++) {
+          const row = aoa[i];
+          const norm = row.map(normalize);
+          const hasFecha = norm.some(c => c.includes('fecha operacion') || c.includes('fecha valor') || c === 'fecha');
+          const hasConcepto = norm.some(c => c.includes('concepto') || c.includes('descripcion') || c.includes('detalle'));
+          const hasImporte = norm.some(c => c.includes('importe') || c.includes('cargo'));
+          if (hasFecha && hasConcepto && hasImporte) {
+            found = i;
+            hdrs = row.map(v => (typeof v === 'string' ? v : '')) as string[];
+            break;
+          }
         }
-      }
-
-      if (headerRowIdx === -1) {
-        const detectedKeys = aoa[0] ? aoa[0].map(x => (x ?? '')).join(', ') : '—';
-        setRows([]);
-        setFinalSaldo(null);
-        setError(`No se detectaron encabezados de movimientos. Revisa que existan columnas como Fecha operación, Concepto, Importe, Saldo. Columnas detectadas: ${detectedKeys}`);
-        return;
-      }
-
-      // Indices de columnas
-      const normHeaders = headers.map(normalize);
-      const findCol = (...candidates: string[]): number => {
-        return normHeaders.findIndex(h => candidates.some(c => h.includes(c)));
+        if (found !== -1) {
+          headerRowIdx = found;
+          headers = hdrs;
+          const normHeaders = headers.map(normalize);
+          const findCol = (...candidates: string[]): number => normHeaders.findIndex(h => candidates.some(c => h.includes(c)));
+          idxFechaOp = findCol('fecha operacion', 'fecha');
+          idxConcepto = findCol('concepto', 'descripcion', 'detalle');
+          idxImporte = findCol('importe', 'cargo');
+          idxSaldo = findCol('saldo');
+        }
       };
-      const idxFechaOp = findCol('fecha operacion', 'fecha');
-      const idxConcepto = findCol('concepto', 'descripcion', 'detalle');
-      const idxImporte = findCol('importe', 'cargo');
-      const idxSaldo = findCol('saldo');
 
       const dataStart = headerRowIdx + 1;
       const mapped: ParsedRow[] = [];
@@ -134,6 +138,36 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
         });
       }
 
+      // Si con la suposición Santander no obtuvimos nada, intentamos autodetección
+      if (mapped.length === 0) {
+        autodetectIfNeeded();
+        const retry: ParsedRow[] = [];
+        const start = headerRowIdx + 1;
+        for (let r = start; r < aoa.length; r++) {
+          const row = aoa[r];
+          if (!row || row.every(v => v == null || String(v).trim() === '')) continue;
+          const fechaOperacion = parseDate(idxFechaOp >= 0 ? (row[idxFechaOp] as unknown) : null);
+          const conceptoCell = idxConcepto >= 0 ? (row[idxConcepto] as unknown) : '';
+          const importeCell = idxImporte >= 0 ? (row[idxImporte] as unknown) : 0;
+          const saldoCell = idxSaldo >= 0 ? (row[idxSaldo] as unknown) : null;
+          const importe = parseNumberEs(importeCell);
+          const saldo = saldoCell != null ? parseNumberEs(saldoCell) : null;
+          if (!conceptoCell && (!importe || importe === 0)) continue;
+          retry.push({
+            fechaOperacion,
+            concepto: String(conceptoCell || ''),
+            importe: Number(importe || 0),
+            saldo,
+          });
+        }
+        if (retry.length > 0) {
+          headers = (aoa[headerRowIdx] || []).map(v => (typeof v === 'string' ? v : '')) as string[];
+          // reemplazar mapped por retry
+          while (mapped.length) mapped.pop();
+          mapped.push(...retry);
+        }
+      }
+
       // Filtrar filas que realmente son movimientos (importe distinto de 0)
       const movimientos = mapped.filter(m => typeof m.importe === 'number' && m.importe !== 0);
 
@@ -144,11 +178,10 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
         return ta - tb;
       });
 
-      // Determinar saldo final: preferimos la última columna 'Saldo' si existe
+      // Determinar saldo actual: tomar el saldo de la PRIMERA fila (la más reciente)
       let computedFinalSaldo: number | null = null;
-      const lastWithSaldo = [...movimientos].reverse().find(r => r.saldo != null);
-      if (lastWithSaldo && lastWithSaldo.saldo != null) {
-        computedFinalSaldo = lastWithSaldo.saldo as number;
+      if (movimientos.length > 0 && movimientos[0].saldo != null) {
+        computedFinalSaldo = movimientos[0].saldo as number;
       }
 
       setRows(movimientos);
@@ -309,33 +342,7 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
             </Table>
           </div>
         )}
-        {rows.length > 0 && (
-          <div style={{ maxHeight: 320, overflow: 'auto' }}>
-            <Table striped bordered hover size="sm">
-              <thead>
-                <tr>
-                  <th>Fecha operación</th>
-                  <th>Concepto</th>
-                  <th className="text-end">Importe (€)</th>
-                  <th className="text-end">Saldo (€)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.slice(0, 50).map((r, i) => (
-                  <tr key={i}>
-                    <td>{r.fechaOperacion ? r.fechaOperacion.toLocaleDateString('es-ES') : ''}</td>
-                    <td>{r.concepto}</td>
-                    <td className="text-end">{r.importe.toFixed(2)}</td>
-                    <td className="text-end">{r.saldo != null ? r.saldo.toFixed(2) : ''}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-            {rows.length > 50 && (
-              <div className="text-muted small">Mostrando 50 de {rows.length} filas…</div>
-            )}
-          </div>
-        )}
+        {/* Ocultamos la tabla detallada; solo mostramos agregados arriba */}
       </Card.Body>
     </Card>
   );
