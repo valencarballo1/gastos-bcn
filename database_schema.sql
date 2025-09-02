@@ -414,3 +414,9 @@ PRINT 'Tablas: Categorias, Gastos';
 PRINT 'Vistas: vw_GastosCompletos, vw_ResumenGastosPorPersona, vw_ResumenGastosPorCategoria';
 PRINT 'Procedimientos: sp_ObtenerUltimosGastosPorPersona, sp_ObtenerGastosPorFechas';
 PRINT 'Triggers: tr_GastosAuditoria (para auditoría)'; 
+
+CREATE TABLE SaldoActual (
+    Id INT IDENTITY(1,1) PRIMARY KEY,       -- Clave primaria autoincremental
+    Valor DECIMAL(18, 2) NOT NULL,          -- Valor numérico con 2 decimales
+    Fecha DATETIME NULL                     -- Fecha opcional
+);

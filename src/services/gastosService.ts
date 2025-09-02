@@ -1,4 +1,5 @@
 import { Gasto, GastoFormData } from '../types';
+import { requestJson } from './api';
 
 const API_BASE_URL = 'https://gastosApiBCN.somee.com/api/Gastos';
 
@@ -13,25 +14,20 @@ export class GastosService {
   }
 
   async getGastos(): Promise<Gasto[]> {
-    const res = await fetch(`${API_BASE_URL}/get-gastos`, { method: 'GET' });
-    if (!res.ok) throw new Error('Error al obtener gastos');
-    const data = await res.json();
-    return data.result?.elementos ?? [];
+    const data = await requestJson<any>(`${API_BASE_URL}/get-gastos`, { method: 'GET' });
+    return (data?.elementos ?? data ?? []) as Gasto[];
   }
 
   async addGasto(gasto: GastoFormData): Promise<Gasto> {
-    const res = await fetch(`${API_BASE_URL}/create-gasto`, {
+    const data = await requestJson<Gasto>(`${API_BASE_URL}/create-gasto`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(gasto)
     });
-    if (!res.ok) throw new Error('Error al crear gasto');
-    const data = await res.json();
-    return data.result ?? data;
+    return data;
   }
 
   async deleteGasto(id: number): Promise<void> {
-    const res = await fetch(`${API_BASE_URL}/delete-gastos/${id}`, { method: 'POST' });
-    if (!res.ok) throw new Error('Error al eliminar gasto');
+    await requestJson<void>(`${API_BASE_URL}/delete-gastos/${id}`, { method: 'POST' });
   }
 }

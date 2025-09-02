@@ -7,7 +7,9 @@ import { GastoForm } from './GastoForm';
 import { CategoriaForm } from './CategoriaForm';
 import { GastosService } from '../services/gastosService';
 import { Gasto } from '../types';
+import ExcelUpload from './ExcelUpload';
 import { BEACH_COLORS } from '../utils/colors';
+import { SaldoService } from '../services/saldoService';
 
 export const Dashboard: React.FC = () => {
   const [gastos, setGastos] = useState<{ ana: Gasto[], valen: Gasto[], total: Gasto[] }>({
@@ -16,8 +18,10 @@ export const Dashboard: React.FC = () => {
     total: []
   });
   const [refreshKey, setRefreshKey] = useState(0);
+  const [saldo, setSaldo] = useState<{ valor: number; fecha?: string } | null>(null);
 
   const gastosService = GastosService.getInstance();
+  const saldoService = SaldoService.getInstance();
 
   const loadGastos = useCallback(async () => {
     try {
@@ -37,6 +41,14 @@ export const Dashboard: React.FC = () => {
 
   useEffect(() => {
     loadGastos();
+    (async () => {
+      try {
+        const s = await saldoService.getSaldoActual();
+        setSaldo(s);
+      } catch (e) {
+        console.error('Error obteniendo saldo actual', e);
+      }
+    })();
   }, [loadGastos, refreshKey]);
 
   const handleGastoAdded = () => {
@@ -93,15 +105,34 @@ export const Dashboard: React.FC = () => {
                     <small>Gastos Registrados</small>
                   </div>
                 </Col>
+                <Col md={12} className="mt-3">
+                  <div
+                    style={{
+                      background: 'rgba(255,255,255,0.15)',
+                      borderRadius: '12px',
+                      padding: '12px 16px',
+                      backdropFilter: 'blur(4px)'
+                    }}
+                    className="d-flex justify-content-center align-items-center gap-3 flex-wrap"
+                  >
+                    <span className="badge bg-light text-dark" style={{ fontSize: '1rem' }}>
+                      Saldo actual: {saldo ? `€${saldo.valor.toFixed(2)}` : '—'}
+                    </span>
+                    {saldo?.fecha && (
+                      <small className="text-white-50">Actualizado: {new Date(saldo.fecha).toLocaleString('es-ES')}</small>
+                    )}
+                  </div>
+                </Col>
               </Row>
             </Card.Body>
           </Card>
         </Col>
       </Row>
 
-      {/* Formularios */}
+      {/* Importación desde Excel y formularios */}
       <Row className="mb-4">
         <Col lg={8}>
+          <ExcelUpload onImported={handleGastoAdded} />
           <GastoForm onGastoAdded={handleGastoAdded} />
         </Col>
         <Col lg={4} className="d-flex align-items-start justify-content-center">

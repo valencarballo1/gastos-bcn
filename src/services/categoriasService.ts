@@ -1,4 +1,5 @@
 import { CategoriaFormData, Categoria } from '../types';
+import { requestJson } from './api';
 
 const API_BASE_URL = 'https://gastosApiBCN.somee.com/api/Categorias';
 
@@ -13,20 +14,17 @@ export class CategoriasService {
   }
 
   async getCategorias(): Promise<Categoria[]> {
-    const res = await fetch(`${API_BASE_URL}/get-categorias`, { method: 'GET' });
-    if (!res.ok) throw new Error('Error al obtener categorías');
-    const data = await res.json();
-    return data.result ?? data; // Ajusta según tu ApiResponse<T>
+    const data = await requestJson<Categoria[] | { elementos: Categoria[] }>(`${API_BASE_URL}/get-categorias`, { method: 'GET' });
+    // tolera respuesta directa o con contenedor de elementos
+    return (data as any)?.elementos ?? (data as any) ?? [];
   }
 
   async addCategoria(categoria: CategoriaFormData): Promise<Categoria> {
-    const res = await fetch(API_BASE_URL, {
+    const data = await requestJson<Categoria>(`${API_BASE_URL}/nueva-categoria`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(categoria)
     });
-    if (!res.ok) throw new Error('Error al crear categoría');
-    const data = await res.json();
-    return data.result ?? data;
+    return data;
   }
 }
