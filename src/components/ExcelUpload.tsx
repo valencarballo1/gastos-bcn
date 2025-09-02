@@ -26,7 +26,7 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
   const [error, setError] = useState<string | null>(null);
   const [saveGastosMessage, setSaveGastosMessage] = useState<string | null>(null);
 
-  const [selectedPersona, setSelectedPersona] = useState<'Ana' | 'Valen'>('Valen');
+  const [selectedPersona] = useState<'Ana' | 'Valen'>('Valen');
   const [categoriaId, setCategoriaId] = useState<string>('');
 
   const formatEuro = (n: number) =>
@@ -152,18 +152,16 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
     setIsSavingGastos(true);
     let created = 0;
     try {
-      for (const r of rows) {
-        // Consideramos como gasto los cargos (importes negativos). Ignoramos abonos/no cargos.
-        if (typeof r.importe !== 'number' || r.importe >= 0) continue;
-        const payload: GastoFormData = {
+      const toCreate: GastoFormData[] = rows
+        .filter(r => typeof r.importe === 'number' && r.importe < 0)
+        .map(r => ({
           monto: Math.abs(r.importe),
           descripcion: r.concepto,
           categoriaId,
           persona: selectedPersona,
-        };
-        await gastosService.addGasto(payload);
-        created += 1;
-      }
+        }));
+      const createdList = await gastosService.addGastosBulk(toCreate);
+      created = createdList.length;
       setSaveGastosMessage(`Se guardaron ${created} gastos correctamente.`);
       if (created > 0) {
         onImported?.();
@@ -192,14 +190,6 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
               Seleccionar Excel
             </label>
             <Button
-              variant="success"
-              disabled={finalSaldo == null || isSavingSaldo}
-              onClick={handleSaveSaldo}
-              className="me-2"
-            >
-              {isSavingSaldo ? (<><Spinner size="sm" animation="border" className="me-2"/>Guardando...</>) : 'Guardar saldo en API'}
-            </Button>
-            <Button
               variant="primary"
               disabled={rows.length === 0 || isSavingGastos}
               onClick={handleSaveGastos}
@@ -226,24 +216,11 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
         </Row>
         {rows.length > 0 && (
           <Row className="mb-3 align-items-end">
-            <Col md={3} className="mb-2">
-              <label className="form-label mb-1">Persona</label>
-              <div className="d-flex gap-2">
-                <div className="form-check">
-                  <input className="form-check-input" type="radio" name="persona" id="personaValen" checked={selectedPersona==='Valen'} onChange={() => setSelectedPersona('Valen')} />
-                  <label className="form-check-label" htmlFor="personaValen">Valen</label>
-                </div>
-                <div className="form-check">
-                  <input className="form-check-input" type="radio" name="persona" id="personaAna" checked={selectedPersona==='Ana'} onChange={() => setSelectedPersona('Ana')} />
-                  <label className="form-check-label" htmlFor="personaAna">Ana</label>
-                </div>
-              </div>
-            </Col>
-            <Col md={4} className="mb-2">
+            <Col md={6} className="mb-2">
               <label className="form-label mb-1" htmlFor="categoriaId">Categoria ID</label>
               <input id="categoriaId" className="form-control" value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)} placeholder="p.ej. 123" />
             </Col>
-            <Col md={5} className="mb-2 text-md-end">
+            <Col md={6} className="mb-2 text-md-end">
               <span className="badge bg-success">Total importe (archivo): {formatEuro(totalImporte)}</span>
             </Col>
           </Row>

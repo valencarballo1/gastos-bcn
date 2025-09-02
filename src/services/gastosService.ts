@@ -31,6 +31,30 @@ export class GastosService {
     return data;
   }
 
+  async addGastosBulk(gastos: GastoFormData[]): Promise<Gasto[]> {
+    // Si existe endpoint bulk, úsalo primero
+    try {
+      const data = await requestJson<Gasto[] | { elementos: Gasto[] }>(`${API_BASE_URL}/create-gastos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(gastos)
+      });
+      if (Array.isArray(data)) return data;
+      if (data && typeof data === 'object' && 'elementos' in data) {
+        return (data as { elementos: Gasto[] }).elementos ?? [];
+      }
+      return [];
+    } catch {
+      // Fallback: secuencial
+      const created: Gasto[] = [];
+      for (const g of gastos) {
+        const r = await this.addGasto(g);
+        created.push(r);
+      }
+      return created;
+    }
+  }
+
   async deleteGasto(id: number): Promise<void> {
     await requestJson<void>(`${API_BASE_URL}/delete-gastos/${id}`, { method: 'POST' });
   }
