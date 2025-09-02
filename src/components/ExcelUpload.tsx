@@ -189,10 +189,12 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
           continue
         }
 
+        const importePositivo = Math.abs(Number(importe || 0))
+
         mapped.push({
           fechaOperacion,
           concepto: String(conceptoCell || ""),
-          importe: Number(importe || 0),
+          importe: importePositivo,
         })
       }
 
