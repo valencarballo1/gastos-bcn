@@ -14,8 +14,12 @@ export class GastosService {
   }
 
   async getGastos(): Promise<Gasto[]> {
-    const data = await requestJson<any>(`${API_BASE_URL}/get-gastos`, { method: 'GET' });
-    return (data?.elementos ?? data ?? []) as Gasto[];
+    const data = await requestJson<Gasto[] | { elementos: Gasto[] }>(`${API_BASE_URL}/get-gastos`, { method: 'GET' });
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === 'object' && 'elementos' in data) {
+      return (data as { elementos: Gasto[] }).elementos ?? [];
+    }
+    return [];
   }
 
   async addGasto(gasto: GastoFormData): Promise<Gasto> {

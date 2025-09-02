@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { Button, Card, Table, Alert, Row, Col, Spinner } from 'react-bootstrap';
 import * as XLSX from 'xlsx';
-import { GastosService } from '../services/gastosService';
 import { SaldoService } from '@/services/saldoService';
 
 interface ParsedRow {
@@ -26,7 +25,7 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
   const formatEuro = (n: number) =>
     n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
 
-  const parseNumberEs = (value: any): number => {
+  const parseNumberEs = (value: unknown): number => {
     if (typeof value === 'number') return value;
     if (typeof value !== 'string') return 0;
     const cleaned = value
@@ -38,7 +37,7 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
     return isNaN(parsed) ? 0 : parsed;
   };
 
-  const parseDate = (value: any): Date | null => {
+  const parseDate = (value: unknown): Date | null => {
     if (value instanceof Date) return value;
     if (typeof value === 'number') {
       const date = XLSX.SSF.parse_date_code(value);
@@ -59,23 +58,23 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
       const workbook = XLSX.read(data);
       const firstSheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[firstSheetName];
-      const json: any[] = XLSX.utils.sheet_to_json(sheet, { defval: null });
+      const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null });
 
       // Mapear columnas esperadas
       const mapped: ParsedRow[] = json
-        .map((r: any) => {
+        .map((r: Record<string, unknown>) => {
           const fechaOperacion = parseDate(
-            r['Fecha operación'] ?? r['Fecha operacion'] ?? r['Fecha'] ?? r['FECHA']
+            (r['Fecha operación'] as unknown) ?? (r['Fecha operacion'] as unknown) ?? (r['Fecha'] as unknown) ?? (r['FECHA'] as unknown)
           );
-          const concepto = r['Concepto'] ?? r['CONCEPTO'] ?? '';
-          const importe = parseNumberEs(r['Importe'] ?? r['IMPORTE'] ?? r['Cargo']);
-          const saldoCell = r['Saldo'] ?? r['SALDO'];
+          const concepto = (r['Concepto'] as unknown) ?? (r['CONCEPTO'] as unknown) ?? '';
+          const importe = parseNumberEs((r['Importe'] as unknown) ?? (r['IMPORTE'] as unknown) ?? (r['Cargo'] as unknown));
+          const saldoCell = (r['Saldo'] as unknown) ?? (r['SALDO'] as unknown);
           const saldo = saldoCell != null ? parseNumberEs(saldoCell) : null;
           if (!fechaOperacion && !concepto && !importe) return null;
           return {
             fechaOperacion,
-            concepto: String(concepto || ''),
-            importe: Number(importe || 0),
+            concepto: String((concepto as string) || ''),
+            importe: Number((importe as number) || 0),
             saldo: saldo,
           } as ParsedRow;
         })
@@ -100,7 +99,7 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
 
       setRows(movimientos);
       setFinalSaldo(computedFinalSaldo);
-    } catch (e: any) {
+    } catch (e) {
       setError('No se pudo leer el archivo. Asegúrate de seleccionar el Excel correcto.');
       console.error(e);
     }
@@ -116,7 +115,7 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
     try {
       const saldoService = SaldoService.getInstance();
       await saldoService.saveSaldo({ valor: finalSaldo, fecha: new Date() });
-    } catch (e: any) {
+    } catch (e) {
       setError('No se pudo guardar el saldo en la API. Revisa la configuración del endpoint.');
     } finally {
       setIsSavingSaldo(false);

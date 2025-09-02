@@ -16,7 +16,11 @@ export class CategoriasService {
   async getCategorias(): Promise<Categoria[]> {
     const data = await requestJson<Categoria[] | { elementos: Categoria[] }>(`${API_BASE_URL}/get-categorias`, { method: 'GET' });
     // tolera respuesta directa o con contenedor de elementos
-    return (data as any)?.elementos ?? (data as any) ?? [];
+    if (Array.isArray(data)) return data;
+    if (data && typeof data === 'object' && 'elementos' in data) {
+      return (data as { elementos: Categoria[] }).elementos ?? [];
+    }
+    return [];
   }
 
   async addCategoria(categoria: CategoriaFormData): Promise<Categoria> {

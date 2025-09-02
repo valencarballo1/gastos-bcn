@@ -7,11 +7,12 @@ export interface ApiEnvelope<T> {
   Result?: T;
 }
 
-export function unwrapApiResponse<T>(data: any): T {
+export function unwrapApiResponse<T>(data: unknown): T {
   if (data == null) return data as T;
   if (typeof data === 'object') {
-    if ('result' in data || 'Result' in data) {
-      return (data as ApiEnvelope<T>).result ?? (data as ApiEnvelope<T>).Result as T;
+    const envelope = data as ApiEnvelope<T>;
+    if ('result' in (data as Record<string, unknown>) || 'Result' in (data as Record<string, unknown>)) {
+      return (envelope.result ?? envelope.Result) as T;
     }
   }
   return data as T;
@@ -19,7 +20,7 @@ export function unwrapApiResponse<T>(data: any): T {
 
 export async function requestJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> {
   const res = await fetch(input, init);
-  let payload: any = null;
+  let payload: unknown = null;
   try {
     payload = await res.json();
   } catch {
@@ -27,11 +28,13 @@ export async function requestJson<T>(input: RequestInfo | URL, init?: RequestIni
   }
 
   if (!res.ok) {
-    const msg = payload?.message || payload?.Message || `HTTP ${res.status}`;
+    const payloadObj = (payload ?? {}) as { message?: string; Message?: string };
+    const msg = payloadObj.message || payloadObj.Message || `HTTP ${res.status}`;
     throw new Error(msg);
   }
 
   return unwrapApiResponse<T>(payload);
 }
+
 
 

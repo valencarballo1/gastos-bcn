@@ -49,7 +49,7 @@ export const Dashboard: React.FC = () => {
         console.error('Error obteniendo saldo actual', e);
       }
     })();
-  }, [loadGastos, refreshKey]);
+  }, [loadGastos, refreshKey, saldoService]);
 
   const handleGastoAdded = () => {
     setRefreshKey(prev => prev + 1);

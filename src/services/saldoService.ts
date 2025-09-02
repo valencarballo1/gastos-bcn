@@ -18,10 +18,12 @@ export class SaldoService {
   }
 
   async getSaldoActual(): Promise<{ valor: number; fecha?: string } | null> {
-    const raw = await requestJson<any>(`${API_BASE_URL}/get`, { method: 'GET', cache: 'no-store' });
-    const payload = unwrapApiResponse<any>(raw as any) as any;
+    const raw = await requestJson<unknown>(`${API_BASE_URL}/get`, { method: 'GET', cache: 'no-store' });
+    const payload = unwrapApiResponse<unknown>(raw as unknown) as unknown as Record<string, unknown> | null;
     if (payload == null) return null;
-    return { valor: Number(payload.valor ?? payload.saldo ?? 0), fecha: payload.fecha };
+    const valor = Number((payload as Record<string, unknown>).valor ?? (payload as Record<string, unknown>).saldo ?? 0);
+    const fecha = (payload as Record<string, unknown>).fecha as string | undefined;
+    return { valor, fecha };
   }
 
   async saveSaldo(dto: SaveSaldoDto): Promise<void> {
