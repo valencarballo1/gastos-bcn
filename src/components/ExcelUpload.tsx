@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Button, Card, Table, Alert, Row, Col, Spinner } from 'react-bootstrap';
 import * as XLSX from 'xlsx';
 import { SaldoService } from '@/services/saldoService';
+import { GastosService } from '@/services/gastosService';
+import { GastoFormData } from '@/types';
 
 interface ParsedRow {
   fechaOperacion: Date | null;
@@ -20,7 +22,12 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [finalSaldo, setFinalSaldo] = useState<number | null>(null);
   const [isSavingSaldo, setIsSavingSaldo] = useState(false);
+  const [isSavingGastos, setIsSavingGastos] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveGastosMessage, setSaveGastosMessage] = useState<string | null>(null);
+
+  const [selectedPersona, setSelectedPersona] = useState<'Ana' | 'Valen'>('Valen');
+  const [categoriaId, setCategoriaId] = useState<string>('');
 
   const formatEuro = (n: number) =>
     n.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' });
@@ -122,6 +129,52 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
     }
   };
 
+  const totalsByConcepto = useMemo(() => {
+    const totals: Record<string, number> = {};
+    for (const r of rows) {
+      const key = r.concepto || '';
+      const importe = Number(r.importe || 0);
+      totals[key] = (totals[key] ?? 0) + importe;
+    }
+    return totals;
+  }, [rows]);
+
+  const totalImporte = useMemo(() => rows.reduce((acc, r) => acc + (r.importe || 0), 0), [rows]);
+
+  const handleSaveGastos = async () => {
+    setError(null);
+    setSaveGastosMessage(null);
+    if (!categoriaId) {
+      setError('Debes indicar un categoriaId para los gastos.');
+      return;
+    }
+    const gastosService = GastosService.getInstance();
+    setIsSavingGastos(true);
+    let created = 0;
+    try {
+      for (const r of rows) {
+        // Consideramos como gasto los cargos (importes negativos). Ignoramos abonos/no cargos.
+        if (typeof r.importe !== 'number' || r.importe >= 0) continue;
+        const payload: GastoFormData = {
+          monto: Math.abs(r.importe),
+          descripcion: r.concepto,
+          categoriaId,
+          persona: selectedPersona,
+        };
+        await gastosService.addGasto(payload);
+        created += 1;
+      }
+      setSaveGastosMessage(`Se guardaron ${created} gastos correctamente.`);
+      if (created > 0) {
+        onImported?.();
+      }
+    } catch (e) {
+      setError('Ocurrió un error guardando los gastos. Intenta nuevamente.');
+    } finally {
+      setIsSavingGastos(false);
+    }
+  };
+
   return (
     <Card className="mb-4">
       <Card.Header>
@@ -142,8 +195,16 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
               variant="success"
               disabled={finalSaldo == null || isSavingSaldo}
               onClick={handleSaveSaldo}
+              className="me-2"
             >
               {isSavingSaldo ? (<><Spinner size="sm" animation="border" className="me-2"/>Guardando...</>) : 'Guardar saldo en API'}
+            </Button>
+            <Button
+              variant="primary"
+              disabled={rows.length === 0 || isSavingGastos}
+              onClick={handleSaveGastos}
+            >
+              {isSavingGastos ? (<><Spinner size="sm" animation="border" className="me-2"/>Guardando...</>) : 'Guardar gastos'}
             </Button>
           </div>
         </div>
@@ -151,6 +212,9 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
       <Card.Body>
         {error && (
           <Alert variant="danger" className="mb-3">{error}</Alert>
+        )}
+        {saveGastosMessage && (
+          <Alert variant="success" className="mb-3">{saveGastosMessage}</Alert>
         )}
         <Row className="mb-3">
           <Col md={6}>
@@ -161,6 +225,30 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
           </Col>
         </Row>
         {rows.length > 0 && (
+          <Row className="mb-3 align-items-end">
+            <Col md={3} className="mb-2">
+              <label className="form-label mb-1">Persona</label>
+              <div className="d-flex gap-2">
+                <div className="form-check">
+                  <input className="form-check-input" type="radio" name="persona" id="personaValen" checked={selectedPersona==='Valen'} onChange={() => setSelectedPersona('Valen')} />
+                  <label className="form-check-label" htmlFor="personaValen">Valen</label>
+                </div>
+                <div className="form-check">
+                  <input className="form-check-input" type="radio" name="persona" id="personaAna" checked={selectedPersona==='Ana'} onChange={() => setSelectedPersona('Ana')} />
+                  <label className="form-check-label" htmlFor="personaAna">Ana</label>
+                </div>
+              </div>
+            </Col>
+            <Col md={4} className="mb-2">
+              <label className="form-label mb-1" htmlFor="categoriaId">Categoria ID</label>
+              <input id="categoriaId" className="form-control" value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)} placeholder="p.ej. 123" />
+            </Col>
+            <Col md={5} className="mb-2 text-md-end">
+              <span className="badge bg-success">Total importe (archivo): {formatEuro(totalImporte)}</span>
+            </Col>
+          </Row>
+        )}
+        {rows.length > 0 && (
           <Row className="mb-3">
             <Col md={6} className="mb-2">
               <span className="badge bg-primary me-2">Movimientos: {rows.length}</span>
@@ -169,6 +257,26 @@ export const ExcelUpload: React.FC<ExcelUploadProps> = ({ onImported }) => {
               <span className="badge bg-success">Total importe: {formatEuro(rows.reduce((acc, r) => acc + (r.importe || 0), 0))}</span>
             </Col>
           </Row>
+        )}
+        {rows.length > 0 && (
+          <div className="mb-3" style={{ maxHeight: 200, overflow: 'auto' }}>
+            <Table bordered size="sm">
+              <thead>
+                <tr>
+                  <th>Concepto</th>
+                  <th className="text-end">Total Importe (€)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(totalsByConcepto).map(([concepto, total]) => (
+                  <tr key={concepto}>
+                    <td>{concepto}</td>
+                    <td className="text-end">{total.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </div>
         )}
         {rows.length > 0 && (
           <div style={{ maxHeight: 320, overflow: 'auto' }}>
