@@ -65,3 +65,11 @@ export interface MercadonaTicket {
   total: number
   tienda: string
 }
+
+export interface GastosPorCategoria {
+  [categoriaId: string]: {
+    categoria: Categoria
+    gastos: Gasto[]
+    total: number
+  }
+}
