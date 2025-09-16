@@ -4,52 +4,45 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { GastoForm } from "./GastoForm"
 import { PDFUpload } from "./PDFUpload"
-import { GastosService } from "@/services/gastosService"
-import type { Gasto } from "@/types"
+import { GastosService } from "../services/gastosService"
+import { CategoriasService } from "../services/categoriasService"
+import type { Gasto, Categoria, GastosPorCategoria } from "../types"
+
+
 
 export const Dashboard: React.FC = () => {
   const [gastos, setGastos] = useState<Gasto[]>([])
+  const [categorias, setCategorias] = useState<Categoria[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState("pdf")
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
 
-  const fetchGastos = async () => {
+  const fetchData = async () => {
     try {
-      const expensesService = GastosService.getInstance()
-      const data = await expensesService.getGastos()
-      setGastos(data)
+      const gastosService = GastosService.getInstance()
+      const categoriasService = CategoriasService.getInstance()
+
+      const [gastosData, categoriasData] = await Promise.all([
+        gastosService.getGastos(),
+        categoriasService.getCategorias(),
+      ])
+
+      setGastos(gastosData)
+      setCategorias(categoriasData)
     } catch (error) {
-      console.error("Error al cargar gastos:", error)
+      console.error("Error al cargar datos:", error)
     } finally {
       setIsLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchGastos()
+    fetchData()
   }, [])
 
   const handleGastoAdded = () => {
-    fetchGastos()
+    fetchData()
   }
-
-  const totalGastos = gastos.reduce((sum, gasto) => sum + gasto.monto, 0)
-
-  const gastosPorCategoria = gastos.reduce(
-    (acc, gasto) => {
-      const categoriaId = gasto.categoria.id
-      if (!acc[categoriaId]) {
-        acc[categoriaId] = {
-          categoria: gasto.categoria,
-          gastos: [],
-          total: 0,
-        }
-      }
-      acc[categoriaId].gastos.push(gasto)
-      acc[categoriaId].total += gasto.monto
-      return acc
-    },
-    {} as Record<string, { categoria: any; gastos: Gasto[]; total: number }>,
-  )
 
   const toggleCategory = (categoriaId: string) => {
     const newExpanded = new Set(expandedCategories)
@@ -61,131 +54,199 @@ export const Dashboard: React.FC = () => {
     setExpandedCategories(newExpanded)
   }
 
+  const gastosPorCategoria: GastosPorCategoria = gastos.reduce((acc, gasto) => {
+    const categoriaId = gasto.categoria.id
+    if (!acc[categoriaId]) {
+      acc[categoriaId] = {
+        categoria: gasto.categoria,
+        gastos: [],
+        total: 0,
+      }
+    }
+    acc[categoriaId].gastos.push(gasto)
+    acc[categoriaId].total += gasto.monto
+    return acc
+  }, {} as GastosPorCategoria)
+
+  const totalGastos = gastos.reduce((sum, gasto) => sum + gasto.monto, 0)
+  const categoryColors = ["#ffb74d", "#ff7043", "#64b5f6", "#81c784", "#ba68c8"]
+
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="text-center space-y-2">
-        <h1 className="futuristic-title">Gestión de Gastos</h1>
-        <p className="futuristic-subtitle">Administra tus gastos de forma sencilla</p>
+    <div
+      className="container py-4"
+      style={{ background: "linear-gradient(135deg, #fffbeb 0%, #ffffff 100%)", minHeight: "100vh" }}
+    >
+      <div className="text-center mb-5">
+        <h1
+          className="display-3 fw-bold mb-3"
+          style={{
+            background: "linear-gradient(90deg, #ea580c, #f97316)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}
+        >
+          <i className="fas fa-chart-line me-3"></i>
+          Gestión de Gastos
+        </h1>
+        <p className="lead text-muted">Dashboard inteligente para el control de tus finanzas</p>
       </div>
 
-      <div className="row g-4">
-        <div className="col-md-6">
-          <div className="futuristic-card pulse-animation">
-            <div className="card-body text-center">
-              <div className="futuristic-stat-number">{gastos.length}</div>
-              <div className="futuristic-stat-label">Total Gastos</div>
-            </div>
+      <div className="row mb-5">
+        <div className="col-md-4 mb-3">
+          <div className="stats-card p-4 text-center">
+            <i className="fas fa-receipt fa-2x mb-3"></i>
+            <h2 className="fw-bold">{gastos.length}</h2>
+            <p className="mb-0">Total Gastos</p>
           </div>
         </div>
-        <div className="col-md-6">
-          <div className="futuristic-card pulse-animation">
-            <div className="card-body text-center">
-              <div className="futuristic-stat-number">{totalGastos.toFixed(2)}€</div>
-              <div className="futuristic-stat-label">Importe Total</div>
-            </div>
+        <div className="col-md-4 mb-3">
+          <div className="stats-card p-4 text-center">
+            <i className="fas fa-euro-sign fa-2x mb-3"></i>
+            <h2 className="fw-bold">{totalGastos.toFixed(2)}€</h2>
+            <p className="mb-0">Importe Total</p>
           </div>
         </div>
-      </div>
-
-      <div className="futuristic-tabs">
-        <ul className="nav nav-tabs futuristic-nav-tabs" id="mainTabs" role="tablist">
-          <li className="nav-item" role="presentation">
-            <button
-              className="nav-link active futuristic-tab"
-              id="pdf-tab"
-              data-bs-toggle="tab"
-              data-bs-target="#pdf"
-              type="button"
-              role="tab"
-            >
-              <i className="fas fa-file-pdf me-2"></i>Importar PDF
-            </button>
-          </li>
-          <li className="nav-item" role="presentation">
-            <button
-              className="nav-link futuristic-tab"
-              id="manual-tab"
-              data-bs-toggle="tab"
-              data-bs-target="#manual"
-              type="button"
-              role="tab"
-            >
-              <i className="fas fa-plus me-2"></i>Gasto Manual
-            </button>
-          </li>
-        </ul>
-        <div className="tab-content futuristic-tab-content" id="mainTabsContent">
-          <div className="tab-pane fade show active" id="pdf" role="tabpanel">
-            <PDFUpload onImported={handleGastoAdded} />
-          </div>
-          <div className="tab-pane fade" id="manual" role="tabpanel">
-            <GastoForm onGastoAdded={handleGastoAdded} />
+        <div className="col-md-4 mb-3">
+          <div className="stats-card p-4 text-center">
+            <i className="fas fa-tags fa-2x mb-3"></i>
+            <h2 className="fw-bold">{Object.keys(gastosPorCategoria).length}</h2>
+            <p className="mb-0">Categorías</p>
           </div>
         </div>
       </div>
 
-      <div className="futuristic-card slide-in-animation">
-        <div className="card-header" style={{ background: "#f8f9fa", color: "#212529", fontWeight: "bold" }}>
-          <h5 className="mb-0">
-            <i className="fas fa-chart-pie me-2"></i>Gastos por Categoría
-          </h5>
+      <div className="futuristic-card mb-5">
+        <div className="card-header p-0" style={{ background: "transparent", border: "none" }}>
+          <ul className="nav nav-tabs" style={{ borderBottom: "2px solid #f97316" }}>
+            <li className="nav-item">
+              <button
+                className={`nav-link ${activeTab === "pdf" ? "active" : ""}`}
+                onClick={() => setActiveTab("pdf")}
+                style={{
+                  color: activeTab === "pdf" ? "#ea580c" : "#6b7280",
+                  borderColor: activeTab === "pdf" ? "#f97316" : "transparent",
+                  fontWeight: "bold",
+                }}
+              >
+                <i className="fas fa-file-pdf me-2"></i>
+                Importar PDF
+              </button>
+            </li>
+            <li className="nav-item">
+              <button
+                className={`nav-link ${activeTab === "manual" ? "active" : ""}`}
+                onClick={() => setActiveTab("manual")}
+                style={{
+                  color: activeTab === "manual" ? "#ea580c" : "#6b7280",
+                  borderColor: activeTab === "manual" ? "#f97316" : "transparent",
+                  fontWeight: "bold",
+                }}
+              >
+                <i className="fas fa-plus me-2"></i>
+                Gasto Manual
+              </button>
+            </li>
+          </ul>
         </div>
         <div className="card-body">
+          {activeTab === "pdf" && <PDFUpload onImported={handleGastoAdded} />}
+          {activeTab === "manual" && <GastoForm onGastoAdded={handleGastoAdded} />}
+        </div>
+      </div>
+
+      <div className="row">
+        <div className="col-12">
+          <h2 className="category-header mb-4">
+            <i className="fas fa-layer-group me-2"></i>
+            Gastos por Categorías
+          </h2>
+
           {isLoading ? (
-            <div className="text-center">
-              <div className="futuristic-loading">
-                <i className="fas fa-spinner fa-spin me-2"></i>Cargando gastos...
+            <div className="text-center py-5">
+              <div className="spinner-border text-warning me-3" role="status" style={{ width: "3rem", height: "3rem" }}>
+                <span className="visually-hidden">Cargando...</span>
               </div>
+              <p className="text-muted mt-3">Analizando tus gastos...</p>
             </div>
           ) : Object.keys(gastosPorCategoria).length === 0 ? (
-            <div className="text-center futuristic-empty-state">
-              <i className="fas fa-inbox fa-3x mb-3"></i>
-              <p>No hay gastos registrados</p>
+            <div className="futuristic-card p-5 text-center">
+              <i className="fas fa-inbox fa-3x text-muted mb-3"></i>
+              <p className="text-muted">No hay gastos registrados</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {Object.entries(gastosPorCategoria).map(([categoriaId, data]) => (
-                <div key={categoriaId} className="futuristic-category-card">
-                  <div
-                    className="futuristic-category-header"
-                    onClick={() => toggleCategory(categoriaId)}
-                    style={{ cursor: "pointer" }}
-                  >
-                    <div className="d-flex justify-content-between align-items-center">
+            <div className="row">
+              {Object.entries(gastosPorCategoria).map(([categoriaId, data], index) => (
+                <div key={categoriaId} className="col-lg-6 mb-4">
+                  <div className="futuristic-card">
+                    <div
+                      className="card-header d-flex justify-content-between align-items-center"
+                      style={{
+                        background: `linear-gradient(135deg, ${categoryColors[index % categoryColors.length]}20, ${categoryColors[index % categoryColors.length]}10)`,
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => toggleCategory(categoriaId)}
+                    >
                       <div className="d-flex align-items-center">
                         <div
-                          className="futuristic-category-color me-3"
-                          style={{ backgroundColor: data.categoria.color }}
+                          className="rounded-circle me-3"
+                          style={{
+                            width: "12px",
+                            height: "12px",
+                            backgroundColor: categoryColors[index % categoryColors.length],
+                            boxShadow: `0 0 10px ${categoryColors[index % categoryColors.length]}50`,
+                          }}
                         ></div>
-                        <div>
-                          <h6 className="mb-0 futuristic-category-name">{data.categoria.nombre}</h6>
-                          <small className="futuristic-category-count">{data.gastos.length} gastos</small>
-                        </div>
+                        <h5 className="mb-0 fw-bold" style={{ color: "#ea580c" }}>
+                          {data.categoria.nombre}
+                        </h5>
                       </div>
                       <div className="d-flex align-items-center">
-                        <span className="futuristic-category-total me-3">{data.total.toFixed(2)}€</span>
-                        <i
-                          className={`fas fa-chevron-${expandedCategories.has(categoriaId) ? "up" : "down"} futuristic-chevron`}
-                        ></i>
+                        <span className="badge me-2" style={{ backgroundColor: "#f97316", color: "white" }}>
+                          {data.gastos.length} gastos
+                        </span>
+                        <h5 className="mb-0 fw-bold text-success">{data.total.toFixed(2)}€</h5>
+                        <i className={`fas fa-chevron-${expandedCategories.has(categoriaId) ? "up" : "down"} ms-2`}></i>
                       </div>
                     </div>
-                  </div>
 
-                  {expandedCategories.has(categoriaId) && (
-                    <div className="futuristic-category-content">
-                      {data.gastos.slice(0, 10).map((gasto) => (
-                        <div key={gasto.id} className="futuristic-expense-item">
-                          <div className="d-flex justify-content-between align-items-center">
+                    {expandedCategories.has(categoriaId) && (
+                      <div className="card-body" style={{ maxHeight: "300px", overflowY: "auto" }}>
+                        {data.gastos.map((gasto, gastoIndex) => (
+                          <div
+                            key={gasto.id}
+                            className="expense-item d-flex justify-content-between align-items-center p-3 mb-2 rounded"
+                            style={{
+                              backgroundColor: gastoIndex % 2 === 0 ? "#fffbeb" : "#ffffff",
+                              animationDelay: `${gastoIndex * 0.1}s`,
+                            }}
+                          >
                             <div>
-                              <div className="futuristic-expense-description">{gasto.descripcion}</div>
-                              <div className="futuristic-expense-person">Por: {gasto.persona}</div>
+                              <p className="fw-medium mb-1" style={{ color: "#374151" }}>
+                                {gasto.descripcion}
+                              </p>
+                              <div className="d-flex align-items-center">
+                                <span className="text-muted small me-3">
+                                  <i className="fas fa-user me-1"></i>
+                                  {gasto.persona}
+                                </span>
+                                {gasto.fecha && (
+                                  <span className="text-muted small">
+                                    <i className="fas fa-calendar me-1"></i>
+                                    {new Date(gasto.fecha).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <div className="futuristic-expense-amount">{gasto.monto.toFixed(2)}€</div>
+                            <h6 className="fw-bold mb-0" style={{ color: "#ea580c" }}>
+                              {gasto.monto.toFixed(2)}€
+                            </h6>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
