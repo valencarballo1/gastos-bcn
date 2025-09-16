@@ -209,16 +209,36 @@ TOTAL (€)49,87`
     try {
       const gastosService = GastosService.getInstance()
 
-      const gastosToCreate: GastoFormData[] = ticket.productos.map((producto) => ({
-        monto: producto.importe,
-        descripcion: `${producto.descripcion} (${producto.cantidad}x)`,
-        categoriaId,
-        persona: selectedPersona,
-      }))
+      const gastosToCreate: GastoFormData[] = []
+
+      ticket.productos.forEach((producto) => {
+        if (producto.cantidad > 1) {
+          // Calculate unit price by dividing total amount by quantity
+          const precioUnitario = producto.importe / producto.cantidad
+
+          // Create individual entries for each unit
+          for (let i = 0; i < producto.cantidad; i++) {
+            gastosToCreate.push({
+              monto: precioUnitario,
+              descripcion: `${producto.descripcion} (unidad ${i + 1} de ${producto.cantidad})`,
+              categoriaId,
+              persona: selectedPersona,
+            })
+          }
+        } else {
+          // Single product, create one entry
+          gastosToCreate.push({
+            monto: producto.importe,
+            descripcion: producto.descripcion,
+            categoriaId,
+            persona: selectedPersona,
+          })
+        }
+      })
 
       await gastosService.addGastosBulk(gastosToCreate)
 
-      setSuccess(`¡Gastos guardados! Se crearon ${gastosToCreate.length} gastos correctamente.`)
+      setSuccess(`¡Gastos guardados! Se crearon ${gastosToCreate.length} gastos individuales correctamente.`)
       onImported?.()
 
       // Clear the ticket after successful save
@@ -352,11 +372,24 @@ TOTAL (€)49,87`
                           key={index}
                           className="d-flex justify-content-between align-items-center p-2 mb-1 bg-light rounded"
                         >
-                          <span>{producto.descripcion}</span>
+                          <div>
+                            <span>{producto.descripcion}</span>
+                            {producto.cantidad > 1 && (
+                              <div className="small text-muted">
+                                {producto.cantidad} unidades × {(producto.importe / producto.cantidad).toFixed(2)}€ cada
+                                una
+                              </div>
+                            )}
+                          </div>
                           <span className="fw-bold">{producto.importe.toFixed(2)}€</span>
                         </div>
                       ))}
                     </div>
+                  </div>
+
+                  <div className="alert alert-info mb-3">
+                    <strong>Se crearán:</strong> {ticket.productos.reduce((total, p) => total + p.cantidad, 0)} gastos
+                    individuales
                   </div>
 
                   {/* Save Button */}
@@ -374,7 +407,7 @@ TOTAL (€)49,87`
                     ) : (
                       <>
                         <i className="fas fa-shopping-cart me-2"></i>
-                        Guardar {ticket.productos.length} gastos
+                        Guardar {ticket.productos.reduce((total, p) => total + p.cantidad, 0)} gastos individuales
                       </>
                     )}
                   </button>
