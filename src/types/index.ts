@@ -21,17 +21,51 @@ export interface Household {
   name: string;
   currency: "EUR";
   timezone: string;
+  createdByUserId?: string;
+  rowVersion?: string;
 }
 
 export interface HouseholdMember {
   id: string;
   householdId: string;
+  userId?: string;
   name: string;
   initials: string;
   email?: string;
   color: string;
+  role: "owner" | "admin" | "member";
   active: boolean;
   joinedAt: string;
+  rowVersion?: string;
+}
+
+export interface UserAccount {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl?: string;
+  initials: string;
+  color: string;
+  provider: "google";
+}
+
+export interface HouseholdSummary {
+  id: string;
+  name: string;
+  memberCount: number;
+}
+
+export interface HouseholdInvitation {
+  id: string;
+  householdId: string;
+  email?: string;
+  role: "admin" | "member";
+  mode: "email" | "link";
+  token: string;
+  inviteUrl?: string;
+  status: "pending" | "accepted" | "expired" | "revoked";
+  createdAt: string;
+  expiresAt: string;
 }
 
 export interface Category {
@@ -39,6 +73,7 @@ export interface Category {
   name: string;
   color: string;
   type: "expense" | "task" | "shopping";
+  rowVersion?: string;
 }
 
 export interface ExpenseParticipant {
@@ -62,6 +97,7 @@ export interface Expense {
   recurringExpenseId?: string;
   notes?: string;
   createdAt: string;
+  rowVersion?: string;
 }
 
 export interface RecurringExpense {
@@ -72,13 +108,17 @@ export interface RecurringExpense {
   estimatedAmount: number | null;
   variableAmount: boolean;
   frequency: "weekly" | "monthly" | "bimonthly" | "quarterly" | "semiannual" | "annual";
+  frequencyInterval?: number;
   dueDay: number;
   paidByMemberId: string;
   participantIds: string[];
   splitType: SplitType;
   status: "active" | "paused";
   nextDueDate: string;
+  startDate?: string;
+  endDate?: string;
   reminderDays: number;
+  rowVersion?: string;
 }
 
 export interface Settlement {
@@ -92,12 +132,15 @@ export interface Settlement {
   concept: string;
   notes?: string;
   status: "active" | "reversed";
+  rowVersion?: string;
 }
 
 export interface ChecklistItem {
   id: string;
   text: string;
   completed: boolean;
+  order?: number;
+  rowVersion?: string;
 }
 
 export interface HouseholdTask {
@@ -106,14 +149,17 @@ export interface HouseholdTask {
   title: string;
   description?: string;
   category: string;
+  categoryId?: string;
   assignedToMemberId?: string;
   priority: TaskPriority;
   status: TaskStatus;
   dueDate?: string;
   recurrence?: string;
+  evidenceUrl?: string;
   checklist: ChecklistItem[];
   createdAt: string;
   completedAt?: string;
+  rowVersion?: string;
 }
 
 export interface ShoppingItem {
@@ -122,14 +168,17 @@ export interface ShoppingItem {
   quantity: number;
   unit: string;
   category: string;
+  categoryId?: string;
   addedByMemberId: string;
   priority: "normal" | "high";
   purchased: boolean;
   supermarket?: string;
+  notes?: string;
   estimatedPrice?: number;
   actualPrice?: number;
   expenseId?: string;
   createdAt: string;
+  rowVersion?: string;
 }
 
 export interface ShoppingList {
@@ -137,8 +186,10 @@ export interface ShoppingList {
   householdId: string;
   name: string;
   weekOf: string;
+  weekStart?: string;
   status: "open" | "closed";
   items: ShoppingItem[];
+  rowVersion?: string;
 }
 
 export interface Activity {

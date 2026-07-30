@@ -144,7 +144,7 @@ export function CalendarPage({ data }: { data: HouseholdData }) {
                   </span>
                   <div>
                     <strong>{event.title}</strong>
-                    <span>{formatLongDate(event.date)}</span>
+                    <span>{formatLongDate(event.date, data.household.timezone)}</span>
                   </div>
                   <small>{event.detail}</small>
                 </article>

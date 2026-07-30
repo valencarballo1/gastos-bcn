@@ -14,6 +14,11 @@ import {
 import { Avatar } from "@/components/common/Avatar";
 import { Modal } from "@/components/common/Modal";
 import { PageHeader } from "@/components/common/PageHeader";
+import { errorMessage } from "@/services/api";
+import {
+  fixedSplitMatchesTotal,
+  previewEqualSplit,
+} from "@/lib/money";
 import type {
   Expense,
   HouseholdData,
@@ -23,7 +28,7 @@ import { formatCurrency, formatLongDate } from "@/utils/format";
 
 interface ExpensesPageProps {
   data: HouseholdData;
-  addExpense: (expense: Omit<Expense, "id" | "householdId" | "createdAt">) => void;
+  addExpense: (expense: Omit<Expense, "id" | "householdId" | "createdAt" | "rowVersion">) => Promise<unknown>;
 }
 
 export function ExpensesPage({ data, addExpense }: ExpensesPageProps) {
@@ -158,7 +163,7 @@ export function ExpensesPage({ data, addExpense }: ExpensesPageProps) {
                 </div>
                 <div className="date-cell">
                   <CalendarDays size={15} />
-                  <span>{formatLongDate(expense.date)}</span>
+                  <span>{formatLongDate(expense.date, data.household.timezone)}</span>
                 </div>
                 <strong className="amount-cell">{formatCurrency(expense.amount)}</strong>
               </article>
@@ -178,8 +183,8 @@ export function ExpensesPage({ data, addExpense }: ExpensesPageProps) {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         data={data}
-        onSubmit={(expense) => {
-          addExpense(expense);
+        onSubmit={async (expense) => {
+          await addExpense(expense);
           setModalOpen(false);
         }}
       />
@@ -196,21 +201,25 @@ function ExpenseFormModal({
   open: boolean;
   onClose: () => void;
   data: HouseholdData;
-  onSubmit: (expense: Omit<Expense, "id" | "householdId" | "createdAt">) => void;
+  onSubmit: (expense: Omit<Expense, "id" | "householdId" | "createdAt" | "rowVersion">) => Promise<unknown>;
 }) {
   const activeMembers = data.members.filter((member) => member.active);
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
-  const [categoryId, setCategoryId] = useState("cat-market");
+  const [categoryId, setCategoryId] = useState(
+    data.categories.find((item) => item.type === "expense")?.id ?? "",
+  );
   const [payerId, setPayerId] = useState(activeMembers[0]?.id ?? "");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [splitType, setSplitType] = useState<SplitType>("equal");
   const [participantIds, setParticipantIds] = useState(activeMembers.map((item) => item.id));
   const [customAmounts, setCustomAmounts] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (submitting) return;
     const numericAmount = Number(amount);
     if (!description.trim() || numericAmount <= 0 || !participantIds.length) {
       setError("Completá la descripción, el importe y al menos un participante.");
@@ -221,40 +230,45 @@ function ExpenseFormModal({
     if (splitType === "responsible") {
       participants = [{ memberId: payerId, amount: numericAmount }];
     } else if (splitType === "equal") {
-      const cents = Math.round(numericAmount * 100);
-      const base = Math.floor(cents / participantIds.length);
-      let used = 0;
-      participants = participantIds.map((memberId, index) => {
-        const share = index === participantIds.length - 1 ? cents - used : base;
-        used += share;
-        return { memberId, amount: share / 100 };
-      });
+      participants = previewEqualSplit(numericAmount, participantIds);
     } else {
       participants = participantIds.map((memberId) => ({
         memberId,
         amount: Number(customAmounts[memberId] ?? 0),
       }));
       const assigned = participants.reduce((sum, item) => sum + item.amount, 0);
-      if (Math.abs(assigned - numericAmount) > 0.009) {
+      if (
+        !fixedSplitMatchesTotal(
+          numericAmount,
+          participants.map((item) => item.amount),
+        )
+      ) {
         setError(`El reparto suma ${formatCurrency(assigned)} y debe sumar ${formatCurrency(numericAmount)}.`);
         return;
       }
     }
 
-    onSubmit({
-      description: description.trim(),
-      amount: numericAmount,
-      categoryId,
-      paidByMemberId: payerId,
-      date: new Date(`${date}T12:00:00`).toISOString(),
-      currency: "EUR",
-      splitType,
-      participants,
-      status: "paid",
-    });
-    setDescription("");
-    setAmount("");
+    setSubmitting(true);
     setError("");
+    try {
+      await onSubmit({
+        description: description.trim(),
+        amount: numericAmount,
+        categoryId,
+        paidByMemberId: payerId,
+        date: new Date(`${date}T12:00:00`).toISOString(),
+        currency: "EUR",
+        splitType,
+        participants,
+        status: "paid",
+      });
+      setDescription("");
+      setAmount("");
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const toggleParticipant = (memberId: string) => {
@@ -273,7 +287,7 @@ function ExpenseFormModal({
       subtitle="Guardaremos el reparto exacto para calcular el balance."
       width="lg"
     >
-      <form className="app-form" onSubmit={submit}>
+      <form className="app-form" onSubmit={(event) => void submit(event)}>
         <div className="form-grid">
           <label className="field field-wide">
             <span>Descripción</span>
@@ -393,8 +407,8 @@ function ExpenseFormModal({
           <button type="button" className="button button-ghost" onClick={onClose}>
             Cancelar
           </button>
-          <button type="submit" className="button button-primary">
-            Guardar gasto
+          <button type="submit" className="button button-primary" disabled={submitting}>
+            {submitting ? "Guardando…" : "Guardar gasto"}
           </button>
         </div>
       </form>

@@ -188,7 +188,13 @@ export function DashboardPage({
                   <div className="compact-main">
                     <strong>{task.title}</strong>
                     <span>
-                      {task.dueDate ? formatDate(task.dueDate) : "Sin fecha"}
+                      {task.dueDate
+                        ? formatDate(
+                            task.dueDate,
+                            undefined,
+                            data.household.timezone,
+                          )
+                        : "Sin fecha"}
                       {task.recurrence ? ` · ${task.recurrence}` : ""}
                     </span>
                   </div>
@@ -219,7 +225,10 @@ export function DashboardPage({
                   <span className="date-cube">
                     <strong>{new Date(item.nextDueDate).getDate()}</strong>
                     <small>
-                      {new Intl.DateTimeFormat("es-ES", { month: "short" }).format(
+                      {new Intl.DateTimeFormat("es-ES", {
+                        month: "short",
+                        timeZone: data.household.timezone,
+                      }).format(
                         new Date(item.nextDueDate),
                       )}
                     </small>
@@ -252,7 +261,13 @@ export function DashboardPage({
           <div className="progress-line">
             <span
               style={{
-                width: `${(list.items.filter((item) => item.purchased).length / list.items.length) * 100}%`,
+                width: `${
+                  list.items.length
+                    ? (list.items.filter((item) => item.purchased).length /
+                        list.items.length) *
+                      100
+                    : 0
+                }%`,
               }}
             />
           </div>
@@ -285,7 +300,13 @@ export function DashboardPage({
                   <strong>{activity.action}</strong>
                   <span>{activity.description}</span>
                 </p>
-                <time>{formatDate(activity.date)}</time>
+                <time>
+                  {formatDate(
+                    activity.date,
+                    undefined,
+                    data.household.timezone,
+                  )}
+                </time>
               </div>
             ))}
           </div>

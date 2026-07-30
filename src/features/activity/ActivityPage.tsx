@@ -42,7 +42,7 @@ export function ActivityPage({ data }: { data: HouseholdData }) {
           <div className="activity-day" key={date}>
             <header>
               <CalendarBadge date={activities[0].date} />
-              <h2>{formatLongDate(activities[0].date)}</h2>
+              <h2>{formatLongDate(activities[0].date, data.household.timezone)}</h2>
             </header>
             <div>
               {activities.map((activity) => {
@@ -62,6 +62,7 @@ export function ActivityPage({ data }: { data: HouseholdData }) {
                       {new Intl.DateTimeFormat("es-ES", {
                         hour: "2-digit",
                         minute: "2-digit",
+                        timeZone: data.household.timezone,
                       }).format(new Date(activity.date))}
                     </time>
                   </article>

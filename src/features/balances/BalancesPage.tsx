@@ -14,6 +14,7 @@ import {
 import { Avatar } from "@/components/common/Avatar";
 import { Modal } from "@/components/common/Modal";
 import { PageHeader } from "@/components/common/PageHeader";
+import { errorMessage } from "@/services/api";
 import type {
   BalanceSummary,
   HouseholdData,
@@ -27,8 +28,8 @@ interface BalancesPageProps {
   balances: BalanceSummary[];
   suggestedTransfers: SuggestedTransfer[];
   addSettlement: (
-    settlement: Omit<Settlement, "id" | "householdId" | "status">,
-  ) => void;
+    settlement: Omit<Settlement, "id" | "householdId" | "status" | "rowVersion">,
+  ) => Promise<unknown>;
 }
 
 export function BalancesPage({
@@ -174,7 +175,7 @@ export function BalancesPage({
                     {from?.name} → {to?.name}
                   </strong>
                   <span>
-                    {settlement.method} · {formatLongDate(settlement.date)}
+                    {settlement.method} · {formatLongDate(settlement.date, data.household.timezone)}
                   </span>
                 </div>
                 <b>{formatCurrency(settlement.amount)}</b>
@@ -197,8 +198,8 @@ export function BalancesPage({
         onClose={() => setModalOpen(false)}
         data={data}
         prefill={prefill}
-        onSubmit={(settlement) => {
-          addSettlement(settlement);
+        onSubmit={async (settlement) => {
+          await addSettlement(settlement);
           setModalOpen(false);
         }}
       />
@@ -217,7 +218,7 @@ function SettlementForm({
   onClose: () => void;
   data: HouseholdData;
   prefill?: SuggestedTransfer;
-  onSubmit: (settlement: Omit<Settlement, "id" | "householdId" | "status">) => void;
+  onSubmit: (settlement: Omit<Settlement, "id" | "householdId" | "status" | "rowVersion">) => Promise<unknown>;
 }) {
   const members = data.members.filter((member) => member.active);
   const [fromId, setFromId] = useState(prefill?.fromMemberId ?? members[0]?.id ?? "");
@@ -225,21 +226,30 @@ function SettlementForm({
   const [amount, setAmount] = useState(prefill ? String(prefill.amount) : "");
   const [method, setMethod] = useState<Settlement["method"]>("Bizum");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (fromId === toId || Number(amount) <= 0) {
       setError("Elegí dos integrantes distintos y un importe mayor a cero.");
       return;
     }
-    onSubmit({
-      fromMemberId: fromId,
-      toMemberId: toId,
-      amount: Number(amount),
-      method,
-      date: new Date().toISOString(),
-      concept: "Liquidación de saldo",
-    });
+    setSubmitting(true);
+    setError("");
+    try {
+      await onSubmit({
+        fromMemberId: fromId,
+        toMemberId: toId,
+        amount: Number(amount),
+        method,
+        date: new Date().toISOString(),
+        concept: "Liquidación de saldo",
+      });
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -249,7 +259,7 @@ function SettlementForm({
       title="Registrar liquidación"
       subtitle="Este pago ajustará el balance, sin modificar los gastos originales."
     >
-      <form className="app-form" onSubmit={submit}>
+      <form className="app-form" onSubmit={(event) => void submit(event)}>
         <div className="form-grid">
           <label className="field">
             <span>Quién paga</span>
@@ -303,8 +313,8 @@ function SettlementForm({
           <button type="button" className="button button-ghost" onClick={onClose}>
             Cancelar
           </button>
-          <button type="submit" className="button button-primary">
-            Registrar pago
+          <button type="submit" className="button button-primary" disabled={submitting}>
+            {submitting ? "Registrando…" : "Registrar pago"}
           </button>
         </div>
       </form>

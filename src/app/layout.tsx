@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     locale: "es_ES",
     images: [
       {
-        url: "/og.png",
+        url: "/og-v2.png",
         width: 1733,
         height: 907,
         alt: "Casa Clara: gastos, compras y tareas del hogar en un mismo lugar",
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Casa Clara",
     description: "Tu hogar, en orden.",
-    images: ["/og.png"],
+    images: ["/og-v2.png"],
   },
 };
 

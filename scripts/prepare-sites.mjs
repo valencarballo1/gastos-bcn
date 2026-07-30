@@ -18,8 +18,7 @@ const worker = `const worker = {
     let response = await env.ASSETS.fetch(request);
 
     if (response.status === 404 && !url.pathname.includes(".")) {
-      const pathname = url.pathname.endsWith("/") ? url.pathname : url.pathname + "/";
-      response = await env.ASSETS.fetch(new Request(new URL(pathname + "index.html", request.url), request));
+      response = await env.ASSETS.fetch(new Request(new URL("/index.html", request.url), request));
     }
 
     if (response.status === 404) {

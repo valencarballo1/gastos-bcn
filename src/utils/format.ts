@@ -5,13 +5,22 @@ export const formatCurrency = (value: number) =>
     minimumFractionDigits: 2,
   }).format(value);
 
-export const formatDate = (value: string, options?: Intl.DateTimeFormatOptions) =>
-  new Intl.DateTimeFormat("es-ES", options ?? { day: "numeric", month: "short" }).format(
-    new Date(value),
-  );
+export const formatDate = (
+  value: string,
+  options?: Intl.DateTimeFormatOptions,
+  timeZone?: string,
+) =>
+  new Intl.DateTimeFormat("es-ES", {
+    ...(options ?? { day: "numeric", month: "short" }),
+    ...(timeZone ? { timeZone } : {}),
+  }).format(new Date(value));
 
-export const formatLongDate = (value: string) =>
-  formatDate(value, { day: "numeric", month: "long", year: "numeric" });
+export const formatLongDate = (value: string, timeZone?: string) =>
+  formatDate(
+    value,
+    { day: "numeric", month: "long", year: "numeric" },
+    timeZone,
+  );
 
 export const daysUntil = (value: string) => {
   const today = new Date();

@@ -3,9 +3,11 @@
 import { useState, type ComponentType, type ReactNode } from "react";
 import {
   BarChart3,
+  BadgeCheck,
   CalendarDays,
   CheckSquare2,
   ChevronDown,
+  ChevronsUpDown,
   CircleDollarSign,
   Clock3,
   Home,
@@ -18,8 +20,15 @@ import {
   Sparkles,
   Users,
   X,
+  Plus,
 } from "lucide-react";
-import type { Household, HouseholdMember, ViewKey } from "@/types";
+import type {
+  Household,
+  HouseholdMember,
+  HouseholdSummary,
+  UserAccount,
+  ViewKey,
+} from "@/types";
 import { Avatar } from "@/components/common/Avatar";
 
 interface NavItem {
@@ -52,6 +61,12 @@ interface AppShellProps {
   onNavigate: (view: ViewKey) => void;
   household: Household;
   members: HouseholdMember[];
+  households: HouseholdSummary[];
+  currentUser: UserAccount;
+  onSwitchHousehold: (householdId: string) => void;
+  onCreateHousehold: () => void;
+  onLogout: () => void;
+  syncing?: boolean;
   children: ReactNode;
 }
 
@@ -60,14 +75,23 @@ export function AppShell({
   onNavigate,
   household,
   members,
+  households,
+  currentUser,
+  onSwitchHousehold,
+  onCreateHousehold,
+  onLogout,
+  syncing = false,
   children,
 }: AppShellProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [householdMenuOpen, setHouseholdMenuOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const current = allNav.find((item) => item.id === activeView) ?? allNav[0];
   const today = new Intl.DateTimeFormat("es-ES", {
     weekday: "long",
     day: "numeric",
     month: "long",
+    timeZone: household.timezone,
   }).format(new Date());
 
   const navigate = (view: ViewKey) => {
@@ -79,7 +103,11 @@ export function AppShell({
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <button className="brand" onClick={() => navigate("dashboard")}>
+        <button
+          className="brand"
+          onClick={() => setHouseholdMenuOpen((open) => !open)}
+          aria-expanded={householdMenuOpen}
+        >
           <span className="brand-mark">
             <Sparkles size={19} />
           </span>
@@ -87,7 +115,43 @@ export function AppShell({
             <strong>Casa Clara</strong>
             <small>{household.name}</small>
           </span>
+          <ChevronsUpDown className="brand-switch-icon" size={15} />
         </button>
+        {householdMenuOpen && (
+          <div className="household-switcher">
+            <span className="nav-label">Mis hogares</span>
+            {households.map((item) => (
+              <button
+                key={item.id}
+                className={item.id === household.id ? "active" : ""}
+                onClick={() => {
+                  onSwitchHousehold(item.id);
+                  setHouseholdMenuOpen(false);
+                  navigate("dashboard");
+                }}
+              >
+                <span className="household-option-mark">
+                  {item.name.slice(0, 1).toUpperCase()}
+                </span>
+                <span>
+                  <strong>{item.name}</strong>
+                  <small>{item.memberCount} integrantes</small>
+                </span>
+                {item.id === household.id && <BadgeCheck size={16} />}
+              </button>
+            ))}
+            <button
+              className="create-household-button"
+              onClick={() => {
+                setHouseholdMenuOpen(false);
+                onCreateHousehold();
+              }}
+            >
+              <Plus size={16} />
+              Crear otro hogar
+            </button>
+          </div>
+        )}
 
         <nav className="sidebar-nav" aria-label="Navegación principal">
           <span className="nav-label">Tu hogar</span>
@@ -139,11 +203,45 @@ export function AppShell({
             <span className="topbar-date">{today}</span>
           </div>
           <div className="topbar-actions">
-            <button className="sync-status">
+            <span className={`sync-status ${syncing ? "is-syncing" : ""}`}>
               <span />
-              Demo local
+              {syncing ? "Actualizando…" : "Sincronizado"}
+            </span>
+            <button
+              className="account-button"
+              onClick={() => setAccountMenuOpen((open) => !open)}
+              aria-label="Abrir cuenta"
+              aria-expanded={accountMenuOpen}
+            >
+              <span
+                className="avatar avatar-md"
+                style={{ backgroundColor: currentUser.color }}
+              >
+                {currentUser.initials}
+              </span>
             </button>
-            <Avatar member={members.find((member) => member.active)} size="md" />
+            {accountMenuOpen && (
+              <div className="account-popover">
+                <div>
+                  <span
+                    className="avatar avatar-lg"
+                    style={{ backgroundColor: currentUser.color }}
+                  >
+                    {currentUser.initials}
+                  </span>
+                  <p>
+                    <strong>{currentUser.name}</strong>
+                    <span>{currentUser.email}</span>
+                  </p>
+                </div>
+                <span className="google-connected">
+                  <BadgeCheck size={15} />
+                  Cuenta de Google conectada
+                </span>
+                <button onClick={() => navigate("settings")}>Gestionar cuenta</button>
+                <button onClick={onLogout}>Cerrar sesión</button>
+              </div>
+            )}
           </div>
         </header>
         <main className="main-content">{children}</main>

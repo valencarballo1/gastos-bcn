@@ -107,6 +107,128 @@ VALUES
     (@HogarId, N'Ana', NULL, N'AN', '#D66A4A', CAST(GETDATE() AS DATE));
 ```
 
+### 3.1.1 Usuarios Google, membresías e invitaciones
+
+`Usuario` y `IntegranteHogar` no son la misma entidad:
+
+- `Usuarios` representa la identidad autenticada con Google.
+- `IntegrantesHogar` representa la membresía dentro de un hogar.
+- Un usuario puede pertenecer a varios hogares.
+- Una invitación pendiente todavía no es integrante y no puede recibir tareas
+  ni participar en gastos.
+
+```sql
+CREATE TABLE Usuarios (
+    Id INT IDENTITY(1,1) NOT NULL,
+    GoogleSubject NVARCHAR(255) NOT NULL,
+    Email NVARCHAR(254) NOT NULL,
+    EmailNormalizado NVARCHAR(254) NOT NULL,
+    Nombre NVARCHAR(150) NOT NULL,
+    AvatarUrl NVARCHAR(1000) NULL,
+    FechaUltimoAcceso DATETIME2(7) NULL,
+    FechaCreacion DATETIME2(7) NOT NULL
+        CONSTRAINT DF_Usuarios_FechaCreacion DEFAULT SYSUTCDATETIME(),
+    FechaActualizacion DATETIME2(7) NULL,
+    Activo BIT NOT NULL CONSTRAINT DF_Usuarios_Activo DEFAULT 1,
+    RowVersion ROWVERSION NOT NULL,
+    CONSTRAINT PK_Usuarios PRIMARY KEY (Id),
+    CONSTRAINT UQ_Usuarios_GoogleSubject UNIQUE (GoogleSubject),
+    CONSTRAINT UQ_Usuarios_EmailNormalizado UNIQUE (EmailNormalizado)
+);
+
+ALTER TABLE IntegrantesHogar ADD
+    UsuarioId INT NULL,
+    Rol NVARCHAR(20) NOT NULL
+        CONSTRAINT DF_IntegrantesHogar_Rol DEFAULT N'member';
+
+ALTER TABLE IntegrantesHogar
+ADD CONSTRAINT FK_IntegrantesHogar_Usuarios
+    FOREIGN KEY (UsuarioId) REFERENCES Usuarios(Id);
+
+ALTER TABLE IntegrantesHogar
+ADD CONSTRAINT CK_IntegrantesHogar_Rol
+    CHECK (Rol IN (N'owner', N'admin', N'member'));
+
+CREATE UNIQUE INDEX UX_IntegrantesHogar_Hogar_Usuario
+ON IntegrantesHogar(HogarId, UsuarioId)
+WHERE UsuarioId IS NOT NULL;
+
+-- Para el hogar migrado, marcar como propietario al integrante original.
+DECLARE @HogarMigradoId INT = (SELECT TOP 1 Id FROM Hogares ORDER BY Id);
+
+UPDATE IntegrantesHogar
+SET Rol = N'owner'
+WHERE Id = (
+    SELECT TOP 1 Id
+    FROM IntegrantesHogar
+    WHERE HogarId = @HogarMigradoId
+    ORDER BY Id
+);
+
+CREATE TABLE InvitacionesHogar (
+    Id UNIQUEIDENTIFIER NOT NULL
+        CONSTRAINT DF_InvitacionesHogar_Id DEFAULT NEWSEQUENTIALID(),
+    HogarId INT NOT NULL,
+    EmailDestino NVARCHAR(254) NULL,
+    EmailDestinoNormalizado NVARCHAR(254) NULL,
+    TokenHash BINARY(32) NOT NULL,
+    Rol NVARCHAR(20) NOT NULL
+        CONSTRAINT DF_InvitacionesHogar_Rol DEFAULT N'member',
+    Modo NVARCHAR(20) NOT NULL,
+    Estado NVARCHAR(20) NOT NULL
+        CONSTRAINT DF_InvitacionesHogar_Estado DEFAULT N'pending',
+    InvitadoPorUsuarioId INT NOT NULL,
+    AceptadoPorUsuarioId INT NULL,
+    FechaCreacion DATETIME2(7) NOT NULL
+        CONSTRAINT DF_InvitacionesHogar_FechaCreacion DEFAULT SYSUTCDATETIME(),
+    FechaExpiracion DATETIME2(7) NOT NULL,
+    FechaAceptacion DATETIME2(7) NULL,
+    FechaRevocacion DATETIME2(7) NULL,
+    RowVersion ROWVERSION NOT NULL,
+    CONSTRAINT PK_InvitacionesHogar PRIMARY KEY (Id),
+    CONSTRAINT FK_InvitacionesHogar_Hogar
+        FOREIGN KEY (HogarId) REFERENCES Hogares(Id),
+    CONSTRAINT FK_InvitacionesHogar_InvitadoPor
+        FOREIGN KEY (InvitadoPorUsuarioId) REFERENCES Usuarios(Id),
+    CONSTRAINT FK_InvitacionesHogar_AceptadoPor
+        FOREIGN KEY (AceptadoPorUsuarioId) REFERENCES Usuarios(Id),
+    CONSTRAINT CK_InvitacionesHogar_Rol
+        CHECK (Rol IN (N'admin', N'member')),
+    CONSTRAINT CK_InvitacionesHogar_Modo
+        CHECK (Modo IN (N'email', N'link')),
+    CONSTRAINT CK_InvitacionesHogar_Estado
+        CHECK (Estado IN (N'pending', N'accepted', N'expired', N'revoked')),
+    CONSTRAINT CK_InvitacionesHogar_Expiracion
+        CHECK (FechaExpiracion > FechaCreacion),
+    CONSTRAINT CK_InvitacionesHogar_Email
+        CHECK (
+            (Modo = N'email' AND EmailDestino IS NOT NULL)
+            OR Modo = N'link'
+        )
+);
+
+CREATE UNIQUE INDEX UX_InvitacionesHogar_TokenHash
+ON InvitacionesHogar(TokenHash);
+
+CREATE INDEX IX_InvitacionesHogar_Hogar_Estado
+ON InvitacionesHogar(HogarId, Estado, FechaExpiracion);
+
+CREATE INDEX IX_InvitacionesHogar_Email_Estado
+ON InvitacionesHogar(EmailDestinoNormalizado, Estado)
+WHERE EmailDestinoNormalizado IS NOT NULL;
+```
+
+Reglas de seguridad del token:
+
+1. Generar al menos 32 bytes aleatorios con un generador criptográfico.
+2. Enviar el token original únicamente dentro del enlace.
+3. Guardar en SQL solamente `SHA-256(token)` dentro de `TokenHash`.
+4. La invitación caduca a los 7 días y es de un único uso.
+5. Si la invitación tiene correo, la cuenta Google que la acepta debe tener el
+   mismo correo normalizado.
+6. Al aceptar, crear `IntegrantesHogar` y actualizar la invitación en la misma
+   transacción.
+
 ### 3.2 Adaptar `Categorias`
 
 La tabla ya existe. Se amplía para que las categorías sean propias de cada
@@ -772,6 +894,50 @@ Base recomendada:
 /api/hogares/{hogarId}
 ```
 
+### 4.0 Autenticación con Google
+
+El login de Google puede conservarse. El backend debe ser el responsable del
+flujo OAuth y de la sesión; el frontend nunca debe guardar tokens de Google en
+`localStorage`.
+
+| Método | Ruta | Uso |
+|---|---|---|
+| `GET` | `/api/auth/google/login?returnUrl=/` | Inicia OAuth con Google |
+| `GET` | `/api/auth/google/callback` | Valida Google y crea la sesión |
+| `GET` | `/api/auth/me` | Usuario autenticado |
+| `POST` | `/api/auth/logout` | Cierra la sesión |
+| `GET` | `/api/usuarios/me/hogares` | Hogares del usuario actual |
+
+La sesión recomendada es una cookie propia del backend:
+
+```text
+HttpOnly
+Secure
+SameSite=Lax
+Path=/
+```
+
+Respuesta de `/api/auth/me`:
+
+```json
+{
+  "id": 18,
+  "name": "Valentín",
+  "email": "valentin@gmail.com",
+  "avatarUrl": "https://...",
+  "provider": "google"
+}
+```
+
+Al volver de Google:
+
+1. Buscar `Usuarios.GoogleSubject`.
+2. Si no existe, crear el usuario con el correo verificado por Google.
+3. Actualizar nombre, avatar y último acceso.
+4. Crear la cookie de sesión propia.
+5. Redirigir únicamente a un `returnUrl` relativo y permitido.
+6. Si venía desde una invitación, continuar el flujo de aceptación.
+
 ### 4.1 Hogares
 
 | Método | Ruta | Uso |
@@ -780,6 +946,24 @@ Base recomendada:
 | `POST` | `/api/hogares` | Crear hogar y categorías iniciales |
 | `GET` | `/api/hogares/{hogarId}` | Detalle del hogar |
 | `PATCH` | `/api/hogares/{hogarId}` | Nombre, moneda o zona horaria |
+
+`POST /api/hogares` debe crear, dentro de una única transacción:
+
+1. El hogar.
+2. La membresía del usuario actual con rol `owner`.
+3. Las categorías iniciales.
+4. La primera lista de supermercado.
+5. El movimiento de actividad.
+
+Petición:
+
+```json
+{
+  "name": "Piso de Barcelona",
+  "currency": "EUR",
+  "timezone": "Europe/Madrid"
+}
+```
 
 ### 4.2 Integrantes
 
@@ -790,6 +974,86 @@ Base recomendada:
 | `GET` | `/api/hogares/{hogarId}/integrantes/{id}` |
 | `PUT` | `/api/hogares/{hogarId}/integrantes/{id}` |
 | `PATCH` | `/api/hogares/{hogarId}/integrantes/{id}/estado` |
+
+Los listados de responsables para gastos y tareas solo deben devolver
+integrantes con `Activo = 1`. Una invitación pendiente no es un integrante.
+
+### 4.2.1 Invitaciones al hogar
+
+| Método | Ruta | Uso |
+|---|---|---|
+| `GET` | `/api/hogares/{hogarId}/invitaciones` | Pendientes y recientes |
+| `POST` | `/api/hogares/{hogarId}/invitaciones` | Invitar por email o enlace |
+| `DELETE` | `/api/hogares/{hogarId}/invitaciones/{id}` | Revocar |
+| `GET` | `/api/invitaciones/{token}` | Datos públicos mínimos |
+| `POST` | `/api/invitaciones/{token}/aceptar` | Aceptar autenticado |
+
+Solo `owner` y `admin` pueden crear o revocar invitaciones.
+
+Invitación por correo:
+
+```json
+{
+  "mode": "email",
+  "email": "persona@gmail.com",
+  "role": "member"
+}
+```
+
+Invitación por enlace:
+
+```json
+{
+  "mode": "link",
+  "role": "member"
+}
+```
+
+Respuesta:
+
+```json
+{
+  "id": "7f97ac0c-7e44-4d98-94e2-891cc2c1dd53",
+  "householdId": 1,
+  "email": "persona@gmail.com",
+  "mode": "email",
+  "role": "member",
+  "status": "pending",
+  "inviteUrl": "https://app.example.com/?invite=token-original",
+  "expiresAt": "2026-08-06T12:00:00Z"
+}
+```
+
+Para `mode=email`, el backend debe enviar un correo que incluya:
+
+- nombre del hogar;
+- nombre de quien invita;
+- fecha de caducidad;
+- botón con el enlace de aceptación.
+
+`GET /api/invitaciones/{token}` no debe revelar integrantes ni datos
+financieros:
+
+```json
+{
+  "householdName": "Piso de Barcelona",
+  "invitedByName": "Valentín",
+  "email": "persona@gmail.com",
+  "expiresAt": "2026-08-06T12:00:00Z",
+  "requiresLogin": true
+}
+```
+
+Al aceptar:
+
+1. Exigir login con Google.
+2. Validar token, estado y expiración.
+3. Comparar el correo cuando la invitación sea por email.
+4. Evitar membresías duplicadas.
+5. Crear `IntegrantesHogar` vinculado a `UsuarioId`.
+6. Marcar la invitación como `accepted`.
+7. Registrar actividad.
+8. Devolver el hogar para que el frontend lo seleccione.
 
 Alta:
 
@@ -1210,18 +1474,32 @@ al día:
 La generación debe ser idempotente: ejecutar el proceso dos veces no puede
 crear dos ocurrencias para la misma fecha.
 
-## 7. Seguridad y autorización futura
+## 7. Seguridad y autorización
 
-Para la demo no es obligatorio implementar autenticación, pero todos los
-controladores deben quedar preparados para obtener el usuario autenticado. En
-una fase posterior conviene crear:
+Google autentica la identidad; la base de datos de Casa Clara decide a qué
+hogares puede entrar esa identidad.
 
-- `Usuarios`
-- `UsuarioIntegranteHogar`
-- invitaciones al hogar
+En cada endpoint con `{hogarId}`:
 
-Nunca autorizar una petición únicamente porque conoce `hogarId`. Se debe
-comprobar que el usuario pertenece a ese hogar.
+1. Obtener el usuario desde la sesión del servidor.
+2. Buscar una fila activa en `IntegrantesHogar` para ese usuario y hogar.
+3. Rechazar con `403` si no pertenece al hogar.
+4. Para administración e invitaciones, exigir rol `owner` o `admin`.
+5. Para transferir propiedad o eliminar un hogar, exigir `owner`.
+
+No confiar en `userId`, `memberId`, rol o correo enviados por el cliente. No
+autorizar una petición únicamente porque conoce `hogarId`.
+
+El secreto OAuth de Google, las claves de correo y la clave de firma de sesión
+deben existir únicamente como secretos del backend. Nunca utilizar variables
+`NEXT_PUBLIC_*` para esos valores.
+
+Si el frontend y la API usan dominios distintos:
+
+- CORS debe aceptar únicamente el dominio real del frontend;
+- habilitar credenciales;
+- no usar `Access-Control-Allow-Origin: *`;
+- añadir protección CSRF a escrituras basadas en cookie.
 
 ## 8. Configuración del frontend al conectar la API
 
@@ -1235,19 +1513,29 @@ Con:
 
 ```env
 NEXT_PUBLIC_API_URL=https://tu-api.example.com/api
+NEXT_PUBLIC_SITE_URL=https://tu-frontend.example.com
+NEXT_PUBLIC_AUTH_ENABLED=true
 ```
 
 Después:
 
-1. Sustituir `useHousehold` por un repositorio que use `householdApi`.
-2. Mantener las firmas de las acciones actuales.
-3. Invalidar/refrescar dashboard, balance y actividad después de cada escritura.
-4. Enviar `rowVersion` en actualizaciones para evitar que una persona pise los
+1. Configurar Google OAuth y la cookie de sesión en el backend.
+2. Sustituir `useHousehold` por un repositorio que use `householdApi`.
+3. Mantener las firmas de las acciones actuales.
+4. Invalidar/refrescar dashboard, balance y actividad después de cada escritura.
+5. Enviar `rowVersion` en actualizaciones para evitar que una persona pise los
    cambios de otra.
-5. Configurar CORS para el dominio real del frontend.
+6. Configurar CORS para el dominio real del frontend.
 
 ## 9. Checklist de aceptación
 
+- [ ] El login Google crea o recupera un único usuario por `GoogleSubject`.
+- [ ] El frontend no recibe ni guarda tokens OAuth de Google.
+- [ ] Un usuario puede crear y cambiar entre varios hogares.
+- [ ] Se puede invitar por correo o por enlace de un solo uso.
+- [ ] Una invitación vencida, revocada o ya aceptada no puede reutilizarse.
+- [ ] Una invitación por correo solo puede aceptarla ese correo de Google.
+- [ ] Solo integrantes activos aparecen como responsables o participantes.
 - [ ] Se pueden crear hogares e integrantes.
 - [ ] Un gasto siempre tiene pagador y participantes.
 - [ ] Los céntimos del reparto suman exactamente el total.

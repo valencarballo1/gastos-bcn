@@ -14,16 +14,17 @@ import {
 import { Avatar } from "@/components/common/Avatar";
 import { Modal } from "@/components/common/Modal";
 import { PageHeader } from "@/components/common/PageHeader";
+import { errorMessage } from "@/services/api";
 import type { HouseholdData, HouseholdTask, TaskPriority } from "@/types";
 import { formatDate } from "@/utils/format";
 
 interface TasksPageProps {
   data: HouseholdData;
   addTask: (
-    task: Omit<HouseholdTask, "id" | "householdId" | "createdAt" | "checklist">,
-  ) => void;
-  setTaskStatus: (id: string, status: HouseholdTask["status"]) => void;
-  toggleChecklist: (taskId: string, checklistId: string) => void;
+    task: Omit<HouseholdTask, "id" | "householdId" | "createdAt" | "checklist" | "rowVersion">,
+  ) => Promise<unknown>;
+  setTaskStatus: (id: string, status: HouseholdTask["status"]) => Promise<unknown>;
+  toggleChecklist: (taskId: string, checklistId: string) => Promise<unknown>;
 }
 
 export function TasksPage({
@@ -96,7 +97,7 @@ export function TasksPage({
               <button
                 className="task-complete-button"
                 onClick={() =>
-                  setTaskStatus(
+                  void setTaskStatus(
                     task.id,
                     task.status === "completed" ? "pending" : "completed",
                   )
@@ -124,7 +125,7 @@ export function TasksPage({
                   {task.dueDate && (
                     <span>
                       <CalendarDays size={15} />
-                      {formatDate(task.dueDate)}
+                      {formatDate(task.dueDate, undefined, data.household.timezone)}
                     </span>
                   )}
                   {task.recurrence && (
@@ -144,7 +145,7 @@ export function TasksPage({
                       <button
                         key={item.id}
                         className={item.completed ? "completed" : ""}
-                        onClick={() => toggleChecklist(task.id, item.id)}
+                        onClick={() => void toggleChecklist(task.id, item.id)}
                       >
                         <i>{item.completed && <Check size={11} />}</i>
                         {item.text}
@@ -161,7 +162,7 @@ export function TasksPage({
                 <button
                   className="button button-small button-soft"
                   onClick={() =>
-                    setTaskStatus(
+                    void setTaskStatus(
                       task.id,
                       task.status === "in_progress" ? "pending" : "in_progress",
                     )
@@ -179,8 +180,8 @@ export function TasksPage({
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         data={data}
-        onSubmit={(task) => {
-          addTask(task);
+        onSubmit={async (task) => {
+          await addTask(task);
           setModalOpen(false);
         }}
       />
@@ -220,36 +221,54 @@ function TaskForm({
   onClose: () => void;
   data: HouseholdData;
   onSubmit: (
-    task: Omit<HouseholdTask, "id" | "householdId" | "createdAt" | "checklist">,
-  ) => void;
+    task: Omit<HouseholdTask, "id" | "householdId" | "createdAt" | "checklist" | "rowVersion">,
+  ) => Promise<unknown>;
 }) {
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("Limpieza");
+  const taskCategories = data.categories.filter(
+    (category) => category.type === "task",
+  );
+  const [categoryId, setCategoryId] = useState(
+    taskCategories[0]?.id ?? "",
+  );
   const [assigneeId, setAssigneeId] = useState(
     data.members.find((member) => member.active)?.id ?? "",
   );
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [dueDate, setDueDate] = useState(new Date().toISOString().slice(0, 10));
   const [recurrence, setRecurrence] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!title.trim()) return;
-    onSubmit({
-      title: title.trim(),
-      category,
-      assignedToMemberId: assigneeId,
-      priority,
-      status: "pending",
-      dueDate: dueDate ? new Date(`${dueDate}T18:00:00`).toISOString() : undefined,
-      recurrence: recurrence || undefined,
-    });
-    setTitle("");
+    setSubmitting(true);
+    setError("");
+    try {
+      await onSubmit({
+        title: title.trim(),
+        categoryId,
+        category:
+          taskCategories.find((item) => item.id === categoryId)?.name ??
+          "Sin categoría",
+        assignedToMemberId: assigneeId,
+        priority,
+        status: "pending",
+        dueDate: dueDate ? new Date(`${dueDate}T18:00:00`).toISOString() : undefined,
+        recurrence: recurrence || undefined,
+      });
+      setTitle("");
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <Modal open={open} onClose={onClose} title="Nueva tarea" subtitle="Definí lo esencial; el resto puede esperar.">
-      <form className="app-form" onSubmit={submit}>
+      <form className="app-form" onSubmit={(event) => void submit(event)}>
         <label className="field">
           <span>¿Qué hay que hacer?</span>
           <input
@@ -262,12 +281,15 @@ function TaskForm({
         <div className="form-grid">
           <label className="field">
             <span>Categoría</span>
-            <select value={category} onChange={(event) => setCategory(event.target.value)}>
-              {["Limpieza", "Cocina", "Lavandería", "Compras", "Mantenimiento", "Mascotas", "Organización", "Pagos"].map(
-                (value) => (
-                  <option key={value}>{value}</option>
-                ),
-              )}
+            <select
+              value={categoryId}
+              onChange={(event) => setCategoryId(event.target.value)}
+            >
+              {taskCategories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
             </select>
           </label>
           <label className="field">
@@ -313,12 +335,13 @@ function TaskForm({
             <option value="Mensual">Mensual</option>
           </select>
         </label>
+        {error && <p className="form-error">{error}</p>}
         <div className="form-actions">
           <button type="button" className="button button-ghost" onClick={onClose}>
             Cancelar
           </button>
-          <button type="submit" className="button button-primary">
-            Crear tarea
+          <button type="submit" className="button button-primary" disabled={submitting}>
+            {submitting ? "Creando…" : "Crear tarea"}
           </button>
         </div>
       </form>

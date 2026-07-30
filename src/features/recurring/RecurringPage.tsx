@@ -14,15 +14,16 @@ import {
 import { Avatar } from "@/components/common/Avatar";
 import { Modal } from "@/components/common/Modal";
 import { PageHeader } from "@/components/common/PageHeader";
+import { errorMessage } from "@/services/api";
 import type { HouseholdData, RecurringExpense } from "@/types";
 import { daysUntil, formatCurrency, formatLongDate } from "@/utils/format";
 
 interface RecurringPageProps {
   data: HouseholdData;
   addRecurringExpense: (
-    expense: Omit<RecurringExpense, "id" | "householdId">,
-  ) => void;
-  toggleRecurringStatus: (id: string) => void;
+    expense: Omit<RecurringExpense, "id" | "householdId" | "rowVersion">,
+  ) => Promise<unknown>;
+  toggleRecurringStatus: (id: string) => Promise<unknown>;
 }
 
 export function RecurringPage({
@@ -124,7 +125,7 @@ export function RecurringPage({
               <div className="recurring-meta">
                 <span>
                   <CalendarClock size={16} />
-                  {formatLongDate(item.nextDueDate)}
+                  {formatLongDate(item.nextDueDate, data.household.timezone)}
                 </span>
                 <span>
                   <Avatar member={payer} size="sm" />
@@ -147,7 +148,7 @@ export function RecurringPage({
                 <span>
                   {dueIn >= 0 ? `Vence en ${dueIn} días` : `Vencido hace ${Math.abs(dueIn)} días`}
                 </span>
-                <button className="text-button" onClick={() => toggleRecurringStatus(item.id)}>
+                <button className="text-button" onClick={() => void toggleRecurringStatus(item.id)}>
                   {item.status === "active" ? <Pause size={15} /> : <RotateCcw size={15} />}
                   {item.status === "active" ? "Pausar" : "Reactivar"}
                 </button>
@@ -161,8 +162,8 @@ export function RecurringPage({
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         data={data}
-        onSubmit={(item) => {
-          addRecurringExpense(item);
+        onSubmit={async (item) => {
+          await addRecurringExpense(item);
           setModalOpen(false);
         }}
       />
@@ -179,18 +180,21 @@ function RecurringForm({
   open: boolean;
   onClose: () => void;
   data: HouseholdData;
-  onSubmit: (item: Omit<RecurringExpense, "id" | "householdId">) => void;
+  onSubmit: (item: Omit<RecurringExpense, "id" | "householdId" | "rowVersion">) => Promise<unknown>;
 }) {
   const activeMembers = data.members.filter((member) => member.active);
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
-  const [categoryId, setCategoryId] = useState("cat-services");
+  const [categoryId, setCategoryId] = useState(
+    data.categories.find((item) => item.type === "expense")?.id ?? "",
+  );
   const [payerId, setPayerId] = useState(activeMembers[0]?.id ?? "");
   const [dueDay, setDueDay] = useState("1");
   const [variable, setVariable] = useState(false);
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const submit = (event: FormEvent) => {
+  const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!name.trim() || (!variable && Number(amount) <= 0)) {
       setError("Completá el nombre y un importe estimado.");
@@ -199,23 +203,30 @@ function RecurringForm({
     const nextDue = new Date();
     nextDue.setMonth(nextDue.getMonth() + 1, Number(dueDay));
     nextDue.setHours(12, 0, 0, 0);
-    onSubmit({
-      name: name.trim(),
-      categoryId,
-      estimatedAmount: amount ? Number(amount) : null,
-      variableAmount: variable,
-      frequency: "monthly",
-      dueDay: Number(dueDay),
-      paidByMemberId: payerId,
-      participantIds: activeMembers.map((member) => member.id),
-      splitType: "equal",
-      status: "active",
-      nextDueDate: nextDue.toISOString(),
-      reminderDays: 3,
-    });
-    setName("");
-    setAmount("");
+    setSubmitting(true);
     setError("");
+    try {
+      await onSubmit({
+        name: name.trim(),
+        categoryId,
+        estimatedAmount: amount ? Number(amount) : null,
+        variableAmount: variable,
+        frequency: "monthly",
+        dueDay: Number(dueDay),
+        paidByMemberId: payerId,
+        participantIds: activeMembers.map((member) => member.id),
+        splitType: "equal",
+        status: "active",
+        nextDueDate: nextDue.toISOString(),
+        reminderDays: 3,
+      });
+      setName("");
+      setAmount("");
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -225,7 +236,7 @@ function RecurringForm({
       title="Nuevo gasto fijo"
       subtitle="La configuración se aplicará solo a próximas ocurrencias."
     >
-      <form className="app-form" onSubmit={submit}>
+      <form className="app-form" onSubmit={(event) => void submit(event)}>
         <label className="field">
           <span>Nombre</span>
           <input
@@ -303,8 +314,8 @@ function RecurringForm({
           <button type="button" className="button button-ghost" onClick={onClose}>
             Cancelar
           </button>
-          <button className="button button-primary" type="submit">
-            Crear gasto fijo
+          <button className="button button-primary" type="submit" disabled={submitting}>
+            {submitting ? "Creando…" : "Crear gasto fijo"}
           </button>
         </div>
       </form>
