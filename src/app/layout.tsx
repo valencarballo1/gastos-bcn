@@ -1,13 +1,32 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
-
 export const metadata: Metadata = {
-  title: "Gastos BCN - Control de Gastos Compartidos",
-  description: "Aplicación para controlar gastos compartidos entre Ana y Valen con estilo playero",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  title: "Casa Clara · Tu hogar, en orden",
+  description:
+    "Gastos, tareas, compras y balances compartidos en una aplicación sencilla para el día a día.",
+  openGraph: {
+    title: "Casa Clara",
+    description: "Tu hogar, en orden.",
+    type: "website",
+    locale: "es_ES",
+    images: [
+      {
+        url: "/og.png",
+        width: 1733,
+        height: 907,
+        alt: "Casa Clara: gastos, compras y tareas del hogar en un mismo lugar",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Casa Clara",
+    description: "Tu hogar, en orden.",
+    images: ["/og.png"],
+  },
 };
 
 export default function RootLayout({
@@ -17,18 +36,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es">
-      <head>
-        <link 
-          rel="stylesheet" 
-          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" 
-          integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" 
-          crossOrigin="anonymous" 
-          referrerPolicy="no-referrer" 
-        />
-      </head>
-      <body className={inter.className}>
-        {children}
-      </body>
+      <body>{children}</body>
     </html>
   );
 }

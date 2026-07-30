@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
+    "build:sites": "next build && node scripts/prepare-sites.mjs",
     "start": "next start",
     "lint": "next lint"
   },
@@ -12,6 +13,7 @@
     "@types/bootstrap": "^5.2.10",
     "@types/xlsx": "^0.0.35",
     "bootstrap": "^5.3.7",
+    "lucide-react": "^1.28.0",
     "next": "15.4.6",
     "pdf-parse": "^1.1.1",
     "react": "19.1.0",
