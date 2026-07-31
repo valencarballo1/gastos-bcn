@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Casa Clara</title>
+  <rect width="512" height="512" fill="#315c49"/>
+  <rect x="51" y="51" width="410" height="410" rx="102" fill="#f7f4ed"/>
+  <path d="M159 241 256 159l97 82M184 220v149h144V220" fill="none" stroke="#315c49" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="m225 297 26 26 51-56" fill="none" stroke="#315c49" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

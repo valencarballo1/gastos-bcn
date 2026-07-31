@@ -32,6 +32,10 @@ import {
   householdApi,
   type PublicInvitation,
 } from "@/services/householdApi";
+import {
+  markOAuthPending,
+  restoreAuthSession,
+} from "@/services/authSession";
 import type { UserAccount, ViewKey } from "@/types";
 
 type AppRoute = {
@@ -121,8 +125,7 @@ export function HomeApp() {
 
   useEffect(() => {
     if (!routeReady) return;
-    householdApi.auth
-      .me()
+    restoreAuthSession()
       .then((user) => {
         setAuthError(null);
         setAuthenticatedUser(normalizeUser(user));
@@ -182,6 +185,7 @@ export function HomeApp() {
       !preservedReturnUrl.startsWith("//")
         ? preservedReturnUrl
         : `${window.location.pathname}${window.location.search}`;
+    markOAuthPending();
     window.location.assign(householdApi.auth.googleLoginUrl(returnUrl));
   };
 

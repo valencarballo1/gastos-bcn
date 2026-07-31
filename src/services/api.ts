@@ -130,6 +130,7 @@ export async function apiRequest<T>(
   path: string,
   init: RequestInit = {},
   retryCsrf = true,
+  notifyUnauthorized = true,
 ): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
   const headers = new Headers(init.headers);
@@ -155,12 +156,12 @@ export async function apiRequest<T>(
 
     if (response.status === 401) {
       clearSessionState();
-      unauthorizedHandler?.();
+      if (notifyUnauthorized) unauthorizedHandler?.();
     }
 
     if (retryCsrf && WRITE_METHODS.has(method) && isAntiforgeryError(error)) {
       clearSessionState();
-      return apiRequest<T>(path, init, false);
+      return apiRequest<T>(path, init, false, notifyUnauthorized);
     }
 
     throw error;

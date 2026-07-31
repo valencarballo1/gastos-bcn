@@ -30,6 +30,7 @@ import type {
   ShoppingList,
   SuggestedTransfer,
 } from "@/types";
+import { invitationToken } from "@/utils/invitations";
 
 const ACTIVE_HOUSEHOLD_KEY = "casaclara-active-household";
 
@@ -800,11 +801,7 @@ function normalizeInvitation(
   householdId: string,
 ): HouseholdInvitation {
   const inviteUrl = input.inviteUrl;
-  const token =
-    input.token ||
-    (inviteUrl
-      ? decodeURIComponent(inviteUrl.split("/invite/")[1] ?? "")
-      : "");
+  const token = invitationToken(input);
   return {
     ...input,
     id: stringId(input.id),
