@@ -137,7 +137,9 @@ export type HouseholdUpdate = Pick<
 
 export const householdApi = {
   auth: {
-    me: () => apiRequest<UserAccount>("/auth/me"),
+    // Never reuse the anonymous response fetched before an OAuth round trip.
+    me: () =>
+      apiRequest<UserAccount>("/auth/me", { cache: "no-store" }, true, false),
     googleLoginUrl: (returnUrl = "/") =>
       `${API_URL}/auth/google/login?returnUrl=${encodeURIComponent(returnUrl)}`,
     logout: () => apiRequest<void>("/auth/logout", { method: "POST" }),
