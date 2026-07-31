@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./globals.css";
 
@@ -7,6 +7,17 @@ export const metadata: Metadata = {
   title: "Casa Clara · Tu hogar, en orden",
   description:
     "Gastos, tareas, compras y balances compartidos en una aplicación sencilla para el día a día.",
+  applicationName: "Casa Clara",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Casa Clara",
+    statusBarStyle: "default",
+  },
+  icons: {
+    icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/icons/icon.svg", type: "image/svg+xml" }],
+  },
   openGraph: {
     title: "Casa Clara",
     description: "Tu hogar, en orden.",
@@ -27,6 +38,10 @@ export const metadata: Metadata = {
     description: "Tu hogar, en orden.",
     images: ["/og-v2.png"],
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#315c49",
 };
 
 export default function RootLayout({

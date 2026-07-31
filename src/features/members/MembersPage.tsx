@@ -25,6 +25,7 @@ import type {
   HouseholdInvitation,
 } from "@/types";
 import { formatLongDate } from "@/utils/format";
+import { copyText, invitationUrl } from "@/utils/invitations";
 
 interface MembersPageProps {
   data: HouseholdData;
@@ -233,10 +234,7 @@ function InvitationForm({
     }
   };
 
-  const invitationUrl = created
-    ? created.inviteUrl ??
-      `${typeof window === "undefined" ? "https://casaclara.app" : window.location.origin}/invite/${encodeURIComponent(created.token)}`
-    : "";
+  const createdInvitationUrl = created ? invitationUrl(created) : "";
 
   return (
     <Modal
@@ -262,17 +260,19 @@ function InvitationForm({
             <p>Caduca en 7 días y solo puede aceptarse una vez.</p>
           </div>
           <label className="copy-link-field">
-            <input value={invitationUrl} readOnly aria-label="Enlace de invitación" />
+            <input value={createdInvitationUrl} readOnly aria-label="Enlace de invitación" />
             <button
               type="button"
               onClick={() => {
-                void navigator.clipboard?.writeText(invitationUrl);
-                setCopied(true);
+                void copyText(createdInvitationUrl)
+                  .then(() => setCopied(true))
+                  .catch((reason) => setError(errorMessage(reason)));
               }}
             >
               <Copy size={16} /> {copied ? "Copiado" : "Copiar"}
             </button>
           </label>
+          {error && <p className="form-error">{error}</p>}
           <button className="button button-primary" onClick={onClose}>
             Listo
           </button>
@@ -344,10 +344,7 @@ function InvitationForm({
 }
 
 function copyInvitation(invitation: HouseholdInvitation) {
-  const url =
-    invitation.inviteUrl ??
-    `${window.location.origin}/invite/${encodeURIComponent(invitation.token)}`;
-  void navigator.clipboard?.writeText(url);
+  void copyText(invitationUrl(invitation));
 }
 
 function roleLabel(role: HouseholdMemberRole) {

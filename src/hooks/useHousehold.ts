@@ -30,6 +30,11 @@ import type {
   ShoppingList,
   SuggestedTransfer,
 } from "@/types";
+import { invitationToken } from "@/utils/invitations";
+import {
+  openShoppingList,
+  openShoppingListsFirst,
+} from "@/utils/shopping";
 
 const ACTIVE_HOUSEHOLD_KEY = "casaclara-active-household";
 
@@ -184,9 +189,9 @@ export function useHousehold(enabled: boolean, requestedHouseholdId?: string) {
       const tasks = settledArray<HouseholdTask>(reads[7]).map(
         (task) => normalizeTask(task, household.id),
       );
-      const shoppingLists = settledArray<ShoppingList>(reads[8]).map(
-        (list) => normalizeShoppingList(list, household.id),
-      );
+      const shoppingLists = settledArray<ShoppingList>(reads[8])
+        .map((list) => normalizeShoppingList(list, household.id))
+        .sort(openShoppingListsFirst);
       const activities = settledArray<Activity>(reads[9]).map(
         (activity) => normalizeActivity(activity, household.id),
       );
@@ -304,7 +309,7 @@ export function useHousehold(enabled: boolean, requestedHouseholdId?: string) {
   );
 
   const householdId = activeHouseholdId || data.household.id;
-  const activeList = data.shoppingLists[0];
+  const activeList = openShoppingList(data.shoppingLists);
 
   const actions = useMemo(
     () => ({
@@ -409,20 +414,21 @@ export function useHousehold(enabled: boolean, requestedHouseholdId?: string) {
           ShoppingItem,
           "id" | "createdAt" | "purchased" | "rowVersion"
         >,
-      ) => {
-        if (!activeList?.id) {
-          return Promise.reject(
-            new Error("Creá una lista de compra antes de agregar productos."),
-          );
-        }
-        return runMutation(() =>
-          householdApi.shopping.addItem(
-            householdId,
-            activeList.id,
-            item,
-          ),
-        );
-      },
+      ) =>
+        runMutation(async () => {
+          // The API also returns historical, closed lists. Adding an item to
+          // one of those raises a server-side reference error, so always use
+          // the open list and create the current one when none exists.
+          const list = activeList?.id
+            ? activeList
+            : normalizeShoppingList(
+                await householdApi.shopping.createList(householdId, {
+                  name: "Lista de compra",
+                }),
+                householdId,
+              );
+          return householdApi.shopping.addItem(householdId, list.id, item);
+        }),
       toggleShoppingItem: (itemId: string) => {
         const item = activeList?.items.find(
           (candidate) => candidate.id === itemId,
@@ -800,11 +806,7 @@ function normalizeInvitation(
   householdId: string,
 ): HouseholdInvitation {
   const inviteUrl = input.inviteUrl;
-  const token =
-    input.token ||
-    (inviteUrl
-      ? decodeURIComponent(inviteUrl.split("/invite/")[1] ?? "")
-      : "");
+  const token = invitationToken(input);
   return {
     ...input,
     id: stringId(input.id),
