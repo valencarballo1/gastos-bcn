@@ -1,6 +1,12 @@
 import { ApiError } from "./api";
 import { householdApi } from "./householdApi";
 import type { UserAccount } from "@/types";
+import {
+  authDebug,
+  authErrorSummary,
+  authUserSummary,
+  safeDiagnosticPath,
+} from "./authDebug";
 
 const OAUTH_PENDING_KEY = "casa-clara:oauth-pending";
 const SESSION_RETRY_DELAYS = [0, 250, 750, 1500];
@@ -23,11 +29,28 @@ export async function restoreAuthSession(): Promise<UserAccount> {
     window.sessionStorage.getItem(OAUTH_PENDING_KEY) === "1";
   const delays = returningFromOAuth ? SESSION_RETRY_DELAYS : [0];
 
+  authDebug("session.restore.started", {
+    returningFromOAuth,
+    route: safeDiagnosticPath(
+      `${window.location.pathname}${window.location.search}`,
+    ),
+    maxAttempts: delays.length,
+  });
+
   for (let index = 0; index < delays.length; index += 1) {
     if (delays[index] > 0) await wait(delays[index]);
 
+    authDebug("session.me.request", {
+      attempt: index + 1,
+      delayMs: delays[index],
+    });
+
     try {
       const user = await householdApi.auth.me();
+      authDebug("session.me.succeeded", {
+        attempt: index + 1,
+        response: authUserSummary(user),
+      });
       clearOAuthPending();
       return user;
     } catch (error) {
@@ -35,6 +58,11 @@ export async function restoreAuthSession(): Promise<UserAccount> {
         error instanceof ApiError &&
         error.status === 401 &&
         index < delays.length - 1;
+      authDebug("session.me.failed", {
+        attempt: index + 1,
+        willRetry: canRetry,
+        ...authErrorSummary(error),
+      });
       if (!canRetry) {
         clearOAuthPending();
         throw error;

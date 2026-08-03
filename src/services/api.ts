@@ -1,3 +1,10 @@
+import {
+  authDebug,
+  authErrorSummary,
+  safeDiagnosticPath,
+  safeResponseUrl,
+} from "./authDebug";
+
 export type ApiFieldErrors = Record<string, string[]>;
 
 export class ApiError extends Error {
@@ -103,7 +110,18 @@ export async function readApiError(response: Response): Promise<ApiError> {
 }
 
 export async function fetchCsrfToken(): Promise<string> {
-  if (csrf) return csrf.token;
+  if (csrf) {
+    authDebug("csrf.cache.hit", {
+      headerName: csrf.headerName,
+      tokenPresent: true,
+    });
+    return csrf.token;
+  }
+
+  authDebug("csrf.request.started", {
+    method: "GET",
+    path: "/api/auth/csrf",
+  });
 
   const response = await fetch(apiEndpoint("/auth/csrf"), {
     method: "GET",
@@ -112,10 +130,25 @@ export async function fetchCsrfToken(): Promise<string> {
     cache: "no-store",
   });
 
+  authDebug("csrf.response.received", {
+    method: "GET",
+    path: "/api/auth/csrf",
+    status: response.status,
+    ok: response.ok,
+    redirected: response.redirected,
+    responseUrl: safeResponseUrl(response.url),
+  });
+
   if (!response.ok) {
     const error = await readApiError(response);
+    authDebug("csrf.response.failed", authErrorSummary(error));
     clearSessionState();
-    if (response.status === 401) unauthorizedHandler?.();
+    if (response.status === 401) {
+      authDebug("session.unauthorized.handler", {
+        source: "/api/auth/csrf",
+      });
+      unauthorizedHandler?.();
+    }
     throw error;
   }
 
@@ -128,6 +161,11 @@ export async function fetchCsrfToken(): Promise<string> {
       message: "La API no devolvió un token CSRF válido.",
     });
   }
+
+  authDebug("csrf.ready", {
+    headerName: csrf.headerName,
+    tokenPresent: true,
+  });
 
   return csrf.token;
 }
@@ -166,6 +204,16 @@ export async function apiRequest<T>(
     headers.set(csrf!.headerName, csrf!.token);
   }
 
+  const diagnosticPath = safeDiagnosticPath(path);
+  const isAuthRequest = diagnosticPath.startsWith("/auth/");
+  if (isAuthRequest) {
+    authDebug("api.request.started", {
+      method,
+      path: `/api${diagnosticPath}`,
+      isMutation,
+    });
+  }
+
   const response = await fetch(apiEndpoint(path), {
     ...init,
     method,
@@ -173,12 +221,36 @@ export async function apiRequest<T>(
     credentials: "include",
   });
 
+  if (isAuthRequest || response.status === 401) {
+    authDebug("api.response.received", {
+      method,
+      path: `/api${diagnosticPath}`,
+      status: response.status,
+      ok: response.ok,
+      redirected: response.redirected,
+      responseUrl: safeResponseUrl(response.url),
+    });
+  }
+
   if (!response.ok) {
     const error = await readApiError(response);
 
+    if (isAuthRequest || response.status === 401) {
+      authDebug("api.response.failed", {
+        method,
+        path: `/api${diagnosticPath}`,
+        ...authErrorSummary(error),
+      });
+    }
+
     if (response.status === 401) {
       clearSessionState();
-      if (notifyUnauthorized) unauthorizedHandler?.();
+      if (notifyUnauthorized) {
+        authDebug("session.unauthorized.handler", {
+          source: `/api${diagnosticPath}`,
+        });
+        unauthorizedHandler?.();
+      }
     }
 
     if (isCsrfError(error)) clearSessionState();

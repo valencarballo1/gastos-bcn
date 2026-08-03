@@ -12,6 +12,7 @@ necesario:
 
 ```env
 VITE_API_URL=https://localhost:7021
+VITE_AUTH_DEBUG=true
 NEXT_PUBLIC_SITE_URL=https://localhost:3000
 NEXT_PUBLIC_AUTH_ENABLED=true
 ```
@@ -21,6 +22,11 @@ ni contener secretos. Next.js la expone al cliente durante el build para mantene
 el mismo contrato de configuración que el resto de frontends de Casa Clara. El
 frontend nunca recibe ni persiste tokens de Google: la sesión se
 mantiene en una cookie segura creada por el backend.
+
+`VITE_AUTH_DEBUG=true` activa trazas seguras en la consola del navegador con el
+prefijo `[Casa Clara Auth]`. Las trazas muestran estados HTTP, rutas y la forma
+de la respuesta de sesión, pero nunca cookies, tokens CSRF, códigos OAuth ni
+secretos. Cambialo a `false` después de terminar el diagnóstico.
 
 La API debe incluir el origen exacto del frontend en
 `Cors__FrontendOrigins__0`. Si frontend y API están en sitios distintos, también

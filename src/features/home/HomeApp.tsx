@@ -38,6 +38,11 @@ import {
   markOAuthPending,
   restoreAuthSession,
 } from "@/services/authSession";
+import {
+  authDebug,
+  authErrorSummary,
+  safeDiagnosticPath,
+} from "@/services/authDebug";
 import type { UserAccount, ViewKey } from "@/types";
 
 type AppRoute = {
@@ -123,6 +128,11 @@ export function HomeApp() {
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
+      authDebug("session.cleared.after-unauthorized", {
+        route: safeDiagnosticPath(
+          `${window.location.pathname}${window.location.search}`,
+        ),
+      });
       clearSessionState();
       clearOAuthPending();
       setAuthState({ status: "anonymous" });
@@ -137,11 +147,19 @@ export function HomeApp() {
   }, [navigatePath]);
 
   const restoreSession = useCallback(async () => {
+    authDebug("auth.state.loading", {
+      route: safeDiagnosticPath(
+        `${window.location.pathname}${window.location.search}`,
+      ),
+    });
     clearSessionState();
     setAuthState({ status: "loading" });
 
     try {
       const user = normalizeUser(await restoreAuthSession());
+      authDebug("auth.state.authenticated", {
+        csrfReady: false,
+      });
       setAuthState({
         status: "authenticated",
         user,
@@ -150,12 +168,16 @@ export function HomeApp() {
 
       try {
         await fetchCsrfToken();
+        authDebug("auth.state.authenticated", {
+          csrfReady: true,
+        });
         setAuthState({
           status: "authenticated",
           user,
           csrfReady: true,
         });
       } catch (reason) {
+        authDebug("auth.csrf.failed", authErrorSummary(reason));
         if (reason instanceof ApiError && reason.status === 401) {
           setAuthState({ status: "anonymous" });
           return;
@@ -168,6 +190,7 @@ export function HomeApp() {
         });
       }
     } catch (reason) {
+      authDebug("auth.restore.failed", authErrorSummary(reason));
       clearSessionState();
       if (reason instanceof ApiError && reason.status === 401) {
         setAuthState({ status: "anonymous" });
@@ -229,6 +252,13 @@ export function HomeApp() {
         ? preservedReturnUrl
         : `${window.location.pathname}${window.location.search}`;
     const returnUrl = new URL(returnPath, window.location.origin).toString();
+    authDebug("oauth.login.redirect", {
+      method: "GET",
+      apiPath: "/api/auth/google/login",
+      apiOrigin: new URL(householdApi.auth.googleLoginUrl(returnUrl)).origin,
+      frontendOrigin: window.location.origin,
+      returnRoute: safeDiagnosticPath(returnPath),
+    });
     clearSessionState();
     markOAuthPending();
     window.location.assign(householdApi.auth.googleLoginUrl(returnUrl));
@@ -238,6 +268,7 @@ export function HomeApp() {
     if (authState.status !== "authenticated") return;
     const user = authState.user;
     clearSessionState();
+    authDebug("csrf.retry.requested");
     setAuthState({ status: "authenticated", user, csrfReady: false });
     try {
       await fetchCsrfToken();
@@ -254,9 +285,14 @@ export function HomeApp() {
   };
 
   const logout = async () => {
+    authDebug("logout.started", {
+      method: "POST",
+      path: "/api/auth/logout",
+    });
     try {
       await householdApi.auth.logout();
     } finally {
+      authDebug("logout.local-state.cleared");
       clearSessionState();
       clearOAuthPending();
       setAuthState({ status: "anonymous" });
