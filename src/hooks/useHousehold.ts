@@ -246,7 +246,18 @@ export function useHousehold(enabled: boolean, requestedHouseholdId?: string) {
   useEffect(() => {
     if (!enabled) {
       requestVersion.current += 1;
+      setData(emptyData);
+      setHouseholds([]);
+      setInvitations([]);
+      setBalances([]);
+      setSuggestedTransfers([]);
+      setDashboard(null);
+      setActiveHouseholdId("");
       setStatus("idle");
+      setMutating(false);
+      setError(null);
+      setFieldErrors({});
+      window.localStorage.removeItem(ACTIVE_HOUSEHOLD_KEY);
       return;
     }
 

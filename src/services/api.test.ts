@@ -3,11 +3,13 @@ import {
   ApiError,
   apiRequest,
   clearSessionState,
+  setUnauthorizedHandler,
 } from "./api";
 
 describe("apiRequest", () => {
   beforeEach(() => {
     clearSessionState();
+    setUnauthorizedHandler(null);
     vi.stubGlobal("fetch", vi.fn());
   });
 
@@ -25,6 +27,8 @@ describe("apiRequest", () => {
       expect.stringMatching(/\/api\/hogares$/),
       expect.objectContaining({ credentials: "include", method: "GET" }),
     );
+    const headers = new Headers(vi.mocked(fetch).mock.calls[0][1]?.headers);
+    expect(headers.get("Accept")).toBe("application/json");
   });
 
   it("obtiene CSRF antes de escribir y envía la cabecera indicada", async () => {
@@ -64,6 +68,72 @@ describe("apiRequest", () => {
       "csrf-token",
     );
     expect(writeInit.credentials).toBe("include");
+  });
+
+  it("renueva CSRF y reintenta una sola vez cuando el token es inválido", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse({
+        token: "csrf-expired",
+        headerName: "X-CSRF-TOKEN",
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        error: true,
+        code: "CSRF_INVALID",
+        message: "Token inválido.",
+      }, 400))
+      .mockResolvedValueOnce(jsonResponse({
+        token: "csrf-renewed",
+        headerName: "X-CSRF-TOKEN",
+      }))
+      .mockResolvedValueOnce(jsonResponse({ id: 1 }, 201));
+
+    await apiRequest("/hogares", {
+      method: "POST",
+      body: JSON.stringify({ name: "Casa" }),
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(4);
+    const retriedWrite = vi.mocked(fetch).mock.calls[3][1] as RequestInit;
+    expect(new Headers(retriedWrite.headers).get("X-CSRF-TOKEN")).toBe(
+      "csrf-renewed",
+    );
+  });
+
+  it("bloquea la mutación si el servidor no puede entregar CSRF", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({
+      error: true,
+      code: "CSRF_UNAVAILABLE",
+      message: "No se pudo preparar CSRF.",
+      traceId: "trace-csrf",
+    }, 503));
+
+    await expect(
+      apiRequest("/hogares", {
+        method: "POST",
+        body: JSON.stringify({ name: "Casa" }),
+      }),
+    ).rejects.toMatchObject({
+      status: 503,
+      code: "CSRF_UNAVAILABLE",
+      traceId: "trace-csrf",
+    });
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
+  it("notifica y limpia la sesión cuando la API responde 401", async () => {
+    const onUnauthorized = vi.fn();
+    setUnauthorizedHandler(onUnauthorized);
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({
+      error: true,
+      code: "AUTH_REQUIRED",
+      message: "Sin sesión.",
+    }, 401));
+
+    await expect(apiRequest("/hogares")).rejects.toMatchObject({
+      status: 401,
+      code: "AUTH_REQUIRED",
+    });
+    expect(onUnauthorized).toHaveBeenCalledOnce();
   });
 
   it("acepta respuestas 204 sin intentar parsear JSON", async () => {
@@ -114,3 +184,10 @@ describe("apiRequest", () => {
     });
   });
 });
+
+function jsonResponse(payload: unknown, status = 200) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}

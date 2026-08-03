@@ -33,18 +33,23 @@ type ApiEnvelope<T> = {
   Result?: T;
 };
 
-const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
-const DEFAULT_API_URL = "https://localhost:7021/api";
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const DEFAULT_API_URL = "https://localhost:7021";
 
 let csrf: CsrfToken | null = null;
 let unauthorizedHandler: (() => void) | null = null;
 
 function getApiUrl() {
-  const configured = process.env.NEXT_PUBLIC_API_URL ?? DEFAULT_API_URL;
+  const configured = process.env.VITE_API_URL ?? DEFAULT_API_URL;
   return configured.replace(/\/+$/, "");
 }
 
 export const API_URL = getApiUrl();
+
+function apiEndpoint(path: string) {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  return `${API_URL}/api${normalizedPath}`;
+}
 
 export function setUnauthorizedHandler(handler: (() => void) | null) {
   unauthorizedHandler = handler;
@@ -71,7 +76,7 @@ async function readPayload(response: Response): Promise<unknown> {
   return response.json().catch(() => undefined);
 }
 
-async function readError(response: Response): Promise<ApiError> {
+export async function readApiError(response: Response): Promise<ApiError> {
   const payload = (await readPayload(response)) as
     | {
         code?: string;
@@ -97,13 +102,22 @@ async function readError(response: Response): Promise<ApiError> {
   });
 }
 
-async function getCsrf(): Promise<CsrfToken> {
-  if (csrf) return csrf;
+export async function fetchCsrfToken(): Promise<string> {
+  if (csrf) return csrf.token;
 
-  const response = await fetch(`${API_URL}/auth/csrf`, {
+  const response = await fetch(apiEndpoint("/auth/csrf"), {
+    method: "GET",
     credentials: "include",
+    headers: { Accept: "application/json" },
+    cache: "no-store",
   });
-  if (!response.ok) throw await readError(response);
+
+  if (!response.ok) {
+    const error = await readApiError(response);
+    clearSessionState();
+    if (response.status === 401) unauthorizedHandler?.();
+    throw error;
+  }
 
   csrf = unwrapApiResponse<CsrfToken>(await readPayload(response));
   if (!csrf?.token || !csrf.headerName) {
@@ -114,16 +128,22 @@ async function getCsrf(): Promise<CsrfToken> {
       message: "La API no devolvió un token CSRF válido.",
     });
   }
-  return csrf;
+
+  return csrf.token;
 }
 
-function isAntiforgeryError(error: ApiError) {
+function isCsrfInvalid(error: ApiError) {
   return (
-    error.status === 400 &&
-    /csrf|xsrf|antiforgery|anti-forgery/i.test(
-      `${error.code} ${error.message}`,
-    )
+    error.code === "CSRF_INVALID" ||
+    (error.status === 400 &&
+      /csrf|xsrf|antiforgery|anti-forgery/i.test(
+        `${error.code} ${error.message}`,
+      ))
   );
+}
+
+function isCsrfError(error: ApiError) {
+  return isCsrfInvalid(error) || error.code === "CSRF_UNAVAILABLE";
 }
 
 export async function apiRequest<T>(
@@ -133,18 +153,20 @@ export async function apiRequest<T>(
   notifyUnauthorized = true,
 ): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
+  const isMutation = !SAFE_METHODS.has(method);
   const headers = new Headers(init.headers);
 
+  headers.set("Accept", "application/json");
   if (init.body && !(init.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 
-  if (WRITE_METHODS.has(method)) {
-    const xsrf = await getCsrf();
-    headers.set(xsrf.headerName, xsrf.token);
+  if (isMutation) {
+    await fetchCsrfToken();
+    headers.set(csrf!.headerName, csrf!.token);
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(apiEndpoint(path), {
     ...init,
     method,
     headers,
@@ -152,15 +174,16 @@ export async function apiRequest<T>(
   });
 
   if (!response.ok) {
-    const error = await readError(response);
+    const error = await readApiError(response);
 
     if (response.status === 401) {
       clearSessionState();
       if (notifyUnauthorized) unauthorizedHandler?.();
     }
 
-    if (retryCsrf && WRITE_METHODS.has(method) && isAntiforgeryError(error)) {
-      clearSessionState();
+    if (isCsrfError(error)) clearSessionState();
+
+    if (retryCsrf && isMutation && isCsrfInvalid(error)) {
       return apiRequest<T>(path, init, false, notifyUnauthorized);
     }
 
@@ -184,6 +207,10 @@ export function apiPath(
 
 export function errorMessage(error: unknown) {
   if (error instanceof ApiError) {
+    const validationMessages = Object.values(error.fieldErrors).flat();
+    if (error.status === 400 && validationMessages.length) {
+      return validationMessages.join(" ");
+    }
     if (error.status === 403) {
       return "No tenés permisos para realizar esta acción en este hogar.";
     }

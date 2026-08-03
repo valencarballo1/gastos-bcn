@@ -76,6 +76,8 @@ describe("payloads de producción", () => {
     expect(taskBody).toMatchObject({
       categoryId: 8,
       assignedToMemberId: 3,
+      priority: "high",
+      dueDate: null,
     });
     expect(taskBody).not.toHaveProperty("category");
 
@@ -94,6 +96,31 @@ describe("payloads de producción", () => {
       addedByMemberId: 3,
     });
     expect(shoppingBody).not.toHaveProperty("category");
+  });
+
+  it("no envía textos visibles donde la API exige IDs", async () => {
+    await expect(
+      Promise.resolve().then(() =>
+        householdApi.tasks.create("1", {
+          title: "Limpiar",
+          category: "Cocina",
+          categoryId: "Cocina",
+          assignedToMemberId: "3",
+          priority: "medium",
+          status: "pending",
+          checklist: [],
+        }),
+      ),
+    ).rejects.toMatchObject({ status: 400, code: "INVALID_ID" });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("construye el login OAuth con /api y un retorno absoluto codificado", () => {
+    const returnUrl = "https://frontend.example/shopping?week=current";
+    const loginUrl = householdApi.auth.googleLoginUrl(returnUrl);
+
+    expect(loginUrl).toContain("/api/auth/google/login?returnUrl=");
+    expect(loginUrl).toContain(encodeURIComponent(returnUrl));
   });
 });
 
