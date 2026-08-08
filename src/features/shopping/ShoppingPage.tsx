@@ -18,6 +18,7 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { errorMessage } from "@/services/api";
 import type { HouseholdData, ShoppingItem } from "@/types";
 import { formatCurrency, formatLongDate } from "@/utils/format";
+import { openShoppingList } from "@/utils/shopping";
 
 interface ShoppingPageProps {
   data: HouseholdData;
@@ -40,7 +41,7 @@ export function ShoppingPage({
   const [finishOpen, setFinishOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("Todas");
-  const list = data.shoppingLists[0];
+  const list = openShoppingList(data.shoppingLists) ?? data.shoppingLists[0];
   const pending = list.items.filter((item) => !item.purchased);
   const purchased = list.items.filter((item) => item.purchased);
   const readyToFinalize = purchased.filter((item) => !item.expenseId);

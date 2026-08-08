@@ -12,12 +12,50 @@ import type {
   ShoppingList,
   UserAccount,
 } from "@/types";
-import { API_URL, apiPath, apiRequest } from "./api";
+import { API_URL, ApiError, apiPath, apiRequest } from "./api";
+
+const TASK_PRIORITIES = new Set(["low", "medium", "high", "urgent"]);
 
 function numericId(value: string | number | undefined) {
   if (value === undefined || value === "") return undefined;
   const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : value;
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new ApiError({
+      status: 400,
+      code: "INVALID_ID",
+      message: "El identificador seleccionado no es válido.",
+    });
+  }
+  return parsed;
+}
+
+function taskPriority(value: HouseholdTask["priority"]) {
+  if (!TASK_PRIORITIES.has(value)) {
+    throw new ApiError({
+      status: 400,
+      code: "INVALID_ENUM",
+      message: "La prioridad seleccionada no es válida.",
+      fieldErrors: {
+        priority: ["Usá low, medium, high o urgent."],
+      },
+    });
+  }
+  return value;
+}
+
+function taskDueDate(value: string | undefined) {
+  if (!value) return null;
+  if (!value.includes("T") || Number.isNaN(Date.parse(value))) {
+    throw new ApiError({
+      status: 400,
+      code: "INVALID_DATE",
+      message: "La fecha límite no es válida.",
+      fieldErrors: {
+        dueDate: ["Usá una fecha ISO 8601 completa."],
+      },
+    });
+  }
+  return value;
 }
 
 function expenseRequest(
@@ -48,8 +86,8 @@ function taskRequest(payload: Omit<HouseholdTask, "id" | "householdId" | "create
     description: payload.description,
     categoryId: numericId(payload.categoryId),
     assignedToMemberId: numericId(payload.assignedToMemberId),
-    priority: payload.priority,
-    dueDate: payload.dueDate,
+    priority: taskPriority(payload.priority),
+    dueDate: taskDueDate(payload.dueDate),
     checklist: payload.checklist.map((item, index) => ({
       text: item.text,
       order: item.order ?? index + 1,
@@ -137,9 +175,11 @@ export type HouseholdUpdate = Pick<
 
 export const householdApi = {
   auth: {
-    me: () => apiRequest<UserAccount>("/auth/me"),
-    googleLoginUrl: (returnUrl = "/") =>
-      `${API_URL}/auth/google/login?returnUrl=${encodeURIComponent(returnUrl)}`,
+    // Never reuse the anonymous response fetched before an OAuth round trip.
+    me: () =>
+      apiRequest<UserAccount>("/auth/me", { cache: "no-store" }, true, false),
+    googleLoginUrl: (returnUrl: string) =>
+      `${API_URL}/api/auth/google/login?returnUrl=${encodeURIComponent(returnUrl)}`,
     logout: () => apiRequest<void>("/auth/logout", { method: "POST" }),
   },
 

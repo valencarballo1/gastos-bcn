@@ -26,12 +26,23 @@ import {
   ApiError,
   clearSessionState,
   errorMessage,
+  fetchCsrfToken,
   setUnauthorizedHandler,
 } from "@/services/api";
 import {
   householdApi,
   type PublicInvitation,
 } from "@/services/householdApi";
+import {
+  clearOAuthPending,
+  markOAuthPending,
+  restoreAuthSession,
+} from "@/services/authSession";
+import {
+  authDebug,
+  authErrorSummary,
+  safeDiagnosticPath,
+} from "@/services/authDebug";
 import type { UserAccount, ViewKey } from "@/types";
 
 type AppRoute = {
@@ -40,6 +51,17 @@ type AppRoute = {
   invitationToken?: string;
   view: ViewKey;
 };
+
+type AuthState =
+  | { status: "loading" }
+  | { status: "anonymous" }
+  | {
+      status: "authenticated";
+      user: UserAccount;
+      csrfReady: boolean;
+      csrfError?: string;
+    }
+  | { status: "error"; message: string; traceId?: string };
 
 const routeSegments: Record<ViewKey, string> = {
   dashboard: "dashboard",
@@ -66,12 +88,11 @@ export function HomeApp() {
   });
   const [routeReady, setRouteReady] = useState(false);
   const [createHouseholdOpen, setCreateHouseholdOpen] = useState(false);
-  const [authStatus, setAuthStatus] = useState<
-    "loading" | "authenticated" | "anonymous"
-  >("loading");
-  const [authenticatedUser, setAuthenticatedUser] =
-    useState<UserAccount | null>(null);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [authState, setAuthState] = useState<AuthState>({
+    status: "loading",
+  });
+  const authenticatedUser =
+    authState.status === "authenticated" ? authState.user : null;
   const {
     data,
     households,
@@ -84,7 +105,7 @@ export function HomeApp() {
     error,
     actions,
   } = useHousehold(
-    authStatus === "authenticated",
+    authState.status === "authenticated",
     route.kind === "household" ? route.householdId : undefined,
   );
 
@@ -107,8 +128,14 @@ export function HomeApp() {
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
-      setAuthenticatedUser(null);
-      setAuthStatus("anonymous");
+      authDebug("session.cleared.after-unauthorized", {
+        route: safeDiagnosticPath(
+          `${window.location.pathname}${window.location.search}`,
+        ),
+      });
+      clearSessionState();
+      clearOAuthPending();
+      setAuthState({ status: "anonymous" });
       navigatePath(
         `/login?returnUrl=${encodeURIComponent(
           `${window.location.pathname}${window.location.search}`,
@@ -119,30 +146,72 @@ export function HomeApp() {
     return () => setUnauthorizedHandler(null);
   }, [navigatePath]);
 
+  const restoreSession = useCallback(async () => {
+    authDebug("auth.state.loading", {
+      route: safeDiagnosticPath(
+        `${window.location.pathname}${window.location.search}`,
+      ),
+    });
+    clearSessionState();
+    setAuthState({ status: "loading" });
+
+    try {
+      const user = normalizeUser(await restoreAuthSession());
+      authDebug("auth.state.authenticated", {
+        csrfReady: false,
+      });
+      setAuthState({
+        status: "authenticated",
+        user,
+        csrfReady: false,
+      });
+
+      try {
+        await fetchCsrfToken();
+        authDebug("auth.state.authenticated", {
+          csrfReady: true,
+        });
+        setAuthState({
+          status: "authenticated",
+          user,
+          csrfReady: true,
+        });
+      } catch (reason) {
+        authDebug("auth.csrf.failed", authErrorSummary(reason));
+        if (reason instanceof ApiError && reason.status === 401) {
+          setAuthState({ status: "anonymous" });
+          return;
+        }
+        setAuthState({
+          status: "authenticated",
+          user,
+          csrfReady: false,
+          csrfError: errorMessage(reason),
+        });
+      }
+    } catch (reason) {
+      authDebug("auth.restore.failed", authErrorSummary(reason));
+      clearSessionState();
+      if (reason instanceof ApiError && reason.status === 401) {
+        setAuthState({ status: "anonymous" });
+      } else {
+        setAuthState({
+          status: "error",
+          message: errorMessage(reason),
+          traceId: reason instanceof ApiError ? reason.traceId : undefined,
+        });
+      }
+    }
+  }, []);
+
   useEffect(() => {
     if (!routeReady) return;
-    householdApi.auth
-      .me()
-      .then((user) => {
-        setAuthError(null);
-        setAuthenticatedUser(normalizeUser(user));
-        setAuthStatus("authenticated");
-      })
-      .catch((reason) => {
-        clearSessionState();
-        if (reason instanceof ApiError && reason.status === 401) {
-          setAuthError(null);
-          setAuthStatus("anonymous");
-        } else {
-          setAuthError(errorMessage(reason));
-          setAuthStatus("anonymous");
-        }
-      });
-  }, [routeReady]);
+    void restoreSession();
+  }, [restoreSession, routeReady]);
 
   useEffect(() => {
     if (
-      authStatus !== "authenticated" ||
+      authState.status !== "authenticated" ||
       status !== "ready" ||
       route.kind === "invite" ||
       route.kind === "households" ||
@@ -160,7 +229,7 @@ export function HomeApp() {
       navigatePath("/households", true);
     }
   }, [
-    authStatus,
+    authState.status,
     data.household.id,
     navigatePath,
     route.kind,
@@ -177,26 +246,61 @@ export function HomeApp() {
       window.location.pathname === "/login"
         ? new URLSearchParams(window.location.search).get("returnUrl")
         : null;
-    const returnUrl =
+    const returnPath =
       preservedReturnUrl?.startsWith("/") &&
       !preservedReturnUrl.startsWith("//")
         ? preservedReturnUrl
         : `${window.location.pathname}${window.location.search}`;
+    const returnUrl = new URL(returnPath, window.location.origin).toString();
+    authDebug("oauth.login.redirect", {
+      method: "GET",
+      apiPath: "/api/auth/google/login",
+      apiOrigin: new URL(householdApi.auth.googleLoginUrl(returnUrl)).origin,
+      frontendOrigin: window.location.origin,
+      returnRoute: safeDiagnosticPath(returnPath),
+    });
+    clearSessionState();
+    markOAuthPending();
     window.location.assign(householdApi.auth.googleLoginUrl(returnUrl));
   };
 
+  const retryCsrf = async () => {
+    if (authState.status !== "authenticated") return;
+    const user = authState.user;
+    clearSessionState();
+    authDebug("csrf.retry.requested");
+    setAuthState({ status: "authenticated", user, csrfReady: false });
+    try {
+      await fetchCsrfToken();
+      setAuthState({ status: "authenticated", user, csrfReady: true });
+    } catch (reason) {
+      if (reason instanceof ApiError && reason.status === 401) return;
+      setAuthState({
+        status: "authenticated",
+        user,
+        csrfReady: false,
+        csrfError: errorMessage(reason),
+      });
+    }
+  };
+
   const logout = async () => {
+    authDebug("logout.started", {
+      method: "POST",
+      path: "/api/auth/logout",
+    });
     try {
       await householdApi.auth.logout();
     } finally {
+      authDebug("logout.local-state.cleared");
       clearSessionState();
-      setAuthenticatedUser(null);
-      setAuthStatus("anonymous");
+      clearOAuthPending();
+      setAuthState({ status: "anonymous" });
       navigatePath("/login", true);
     }
   };
 
-  if (!routeReady || authStatus === "loading") {
+  if (!routeReady || authState.status === "loading") {
     return <AuthScreen loading />;
   }
 
@@ -204,21 +308,29 @@ export function HomeApp() {
     return (
       <InvitationScreen
         token={route.invitationToken ?? ""}
-        authenticated={authStatus === "authenticated"}
+        authenticated={authState.status === "authenticated"}
         onLogin={signIn}
       />
     );
   }
 
-  if (authStatus === "anonymous") {
+  if (authState.status === "error") {
     return (
       <AuthScreen
+        error={authState.message}
+        onRetry={() => void restoreSession()}
         onGoogleSignIn={signIn}
-        error={authError}
-        onRetry={() => window.location.reload()}
       />
     );
   }
+
+  if (authState.status === "anonymous") {
+    return (
+      <AuthScreen onGoogleSignIn={signIn} />
+    );
+  }
+
+  const csrfError = authState.csrfReady ? undefined : authState.csrfError;
 
   if (loading && !data.household.id && route.kind !== "households") {
     return <LoadingHousehold />;
@@ -232,7 +344,9 @@ export function HomeApp() {
           user={authenticatedUser}
           loading={loading}
           error={error}
+          mutationWarning={csrfError}
           onRetry={actions.refresh}
+          onRetryCsrf={retryCsrf}
           onSelect={(id) =>
             navigatePath(householdPath(id, "dashboard"))
           }
@@ -277,6 +391,12 @@ export function HomeApp() {
       onLogout={() => void logout()}
       syncing={loading || mutating}
     >
+      {csrfError && (
+        <MutationProtectionAlert
+          message={csrfError}
+          onRetry={() => void retryCsrf()}
+        />
+      )}
       {error && (
         <div className="api-alert" role="alert">
           <span>{error}</span>
@@ -451,7 +571,9 @@ function HouseholdPicker({
   user,
   loading,
   error,
+  mutationWarning,
   onRetry,
+  onRetryCsrf,
   onSelect,
   onCreate,
   onLogout,
@@ -460,7 +582,9 @@ function HouseholdPicker({
   user: UserAccount | null;
   loading: boolean;
   error: string | null;
+  mutationWarning?: string;
   onRetry: () => Promise<void>;
+  onRetryCsrf: () => Promise<void>;
   onSelect: (id: string) => void;
   onCreate: () => void;
   onLogout: () => Promise<void>;
@@ -483,6 +607,12 @@ function HouseholdPicker({
         <span className="eyebrow">Tus espacios</span>
         <h1>Elegí un hogar</h1>
         <p>Los datos se actualizan directamente desde Casa Clara.</p>
+        {mutationWarning && (
+          <MutationProtectionAlert
+            message={mutationWarning}
+            onRetry={() => void onRetryCsrf()}
+          />
+        )}
         {error && (
           <div className="api-alert" role="alert">
             <span>{error}</span>
@@ -518,6 +648,23 @@ function HouseholdPicker({
         )}
       </section>
     </main>
+  );
+}
+
+function MutationProtectionAlert({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="api-alert" role="alert">
+      <span>No se pueden guardar cambios. {message}</span>
+      <button onClick={onRetry}>
+        <RefreshCw size={15} /> Reintentar protección
+      </button>
+    </div>
   );
 }
 

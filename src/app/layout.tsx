@@ -8,6 +8,7 @@ export const metadata: Metadata = {
   title: "Casa Clara · Tu hogar, en orden",
   description:
     "Gastos, tareas, compras y balances compartidos en una aplicación sencilla para el día a día.",
+<<<<<<< HEAD
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
@@ -48,6 +49,18 @@ export const metadata: Metadata = {
   },
   formatDetection: {
     telephone: false,
+=======
+  applicationName: "Casa Clara",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Casa Clara",
+    statusBarStyle: "default",
+  },
+  icons: {
+    icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/icons/icon.svg", type: "image/svg+xml" }],
+>>>>>>> 0f06c5daab478e5323d9e28d7ac6ffe32cb87aeb
   },
   openGraph: {
     title: "Casa Clara",
@@ -72,7 +85,11 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+<<<<<<< HEAD
   themeColor: "#30483b",
+=======
+  themeColor: "#315c49",
+>>>>>>> 0f06c5daab478e5323d9e28d7ac6ffe32cb87aeb
 };
 
 export default function RootLayout({
