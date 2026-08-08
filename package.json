@@ -6,6 +6,7 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "build:sites": "next build && node scripts/prepare-sites.mjs",
+    "generate:icons": "node scripts/generate-icons.mjs",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
@@ -36,6 +37,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.4.6",
     "jsdom": "^29.1.1",
+    "sharp": "^0.34.3",
     "typescript": "^5",
     "vitest": "^4.1.10"
   }
