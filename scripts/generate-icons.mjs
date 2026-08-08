@@ -35,6 +35,7 @@ await Promise.all(
         fit: "cover",
         kernel: sharp.kernel.lanczos3,
       })
+      .ensureAlpha()
       .png({ compressionLevel: 9 })
       .toFile(path.join(publicIcons, filename)),
   ),
