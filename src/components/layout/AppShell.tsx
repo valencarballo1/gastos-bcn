@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ComponentType, type ReactNode } from "react";
+import { useRef, useState, type ComponentType, type ReactNode } from "react";
 import {
   BarChart3,
   BadgeCheck,
@@ -30,6 +30,7 @@ import type {
   ViewKey,
 } from "@/types";
 import { Avatar } from "@/components/common/Avatar";
+import { useClickOutside } from "@/hooks/useClickOutside";
 
 interface NavItem {
   id: ViewKey;
@@ -86,6 +87,16 @@ export function AppShell({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [householdMenuOpen, setHouseholdMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const sidebarRef = useRef<HTMLElement | null>(null);
+  const accountMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useClickOutside([sidebarRef], householdMenuOpen, () =>
+    setHouseholdMenuOpen(false),
+  );
+  useClickOutside([accountMenuRef], accountMenuOpen, () =>
+    setAccountMenuOpen(false),
+  );
+
   const current = allNav.find((item) => item.id === activeView) ?? allNav[0];
   const today = new Intl.DateTimeFormat("es-ES", {
     weekday: "long",
@@ -102,7 +113,7 @@ export function AppShell({
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <aside className="sidebar" ref={sidebarRef}>
         <button
           className="brand"
           onClick={() => setHouseholdMenuOpen((open) => !open)}
@@ -202,7 +213,7 @@ export function AppShell({
             <span className="topbar-view">{current.label}</span>
             <span className="topbar-date">{today}</span>
           </div>
-          <div className="topbar-actions">
+          <div className="topbar-actions" ref={accountMenuRef}>
             <span className={`sync-status ${syncing ? "is-syncing" : ""}`}>
               <span />
               {syncing ? "Actualizando…" : "Sincronizado"}
