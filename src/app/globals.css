@@ -4601,15 +4601,27 @@ button:disabled {
   }
 
   .modal-backdrop {
-    align-items: flex-end;
+    align-items: stretch;
     padding: 0;
   }
 
   .modal-panel {
     width: 100%;
-    max-height: 92vh;
-    max-height: 92dvh;
-    border-radius: 23px 23px 0 0;
+    max-height: none;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    animation: modal-in-mobile 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes modal-in-mobile {
+    from {
+      transform: translateY(100%);
+    }
+  }
+
+  .modal-header {
+    padding-top: max(20px, env(safe-area-inset-top));
   }
 
   .modal-header,
@@ -4617,9 +4629,21 @@ button:disabled {
     padding-inline: 17px;
   }
 
+  .modal-body {
+    padding-bottom: 120px;
+  }
+
   .modal-body .form-actions {
-    margin-inline: -17px;
-    padding-inline: 17px;
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 2;
+    margin: 0;
+    padding: 14px 17px calc(14px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: var(--surface);
+    box-shadow: 0 -10px 18px -12px rgba(36, 49, 42, 0.12);
   }
 
   .recurring-summary > div,
