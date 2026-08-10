@@ -287,6 +287,7 @@ function SettlementForm({
               <span>€</span>
               <input
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0.01"
                 value={amount}

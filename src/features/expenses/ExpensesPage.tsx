@@ -298,12 +298,13 @@ function ExpenseFormModal({
               onChange={(event) => setDescription(event.target.value)}
             />
           </label>
-          <label className="field">
+          <label className="field field-wide">
             <span>Importe</span>
-            <div className="input-prefix">
+            <div className="input-prefix input-prefix-large">
               <span>€</span>
               <input
                 type="number"
+                inputMode="decimal"
                 min="0.01"
                 step="0.01"
                 placeholder="0,00"
@@ -381,6 +382,7 @@ function ExpenseFormModal({
                         <input
                           aria-label={`Importe de ${member.name}`}
                           type="number"
+                          inputMode="decimal"
                           step="0.01"
                           min="0"
                           placeholder="0,00"
