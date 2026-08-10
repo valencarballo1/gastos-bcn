@@ -5,6 +5,7 @@ import {
   clearSessionState,
   setUnauthorizedHandler,
 } from "./api";
+import { householdApi } from "./householdApi";
 
 describe("apiRequest", () => {
   beforeEach(() => {
@@ -181,6 +182,42 @@ describe("apiRequest", () => {
         participants: ["El reparto no coincide."],
       },
       traceId: "trace-123",
+    });
+  });
+
+  it("completa registro, sesión CSRF y creación de hogar", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse({
+        id: "7", name: "María Prueba", email: "maria@example.com",
+        initials: "MP", color: "#4F7C65", provider: "password",
+      }, 201))
+      .mockResolvedValueOnce(jsonResponse({
+        token: "csrf-after-register", headerName: "X-CSRF-TOKEN",
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        id: "12", name: "Casa Prueba", currency: "EUR", timezone: "Europe/Madrid",
+      }, 201));
+
+    await householdApi.auth.register({
+      fullName: "María Prueba",
+      email: "maria@example.com",
+      password: "clave-segura-123",
+    });
+    await householdApi.households.create({
+      name: "Casa Prueba", currency: "EUR", timezone: "Europe/Madrid",
+    });
+
+    expect(fetch).toHaveBeenCalledTimes(3);
+    const register = vi.mocked(fetch).mock.calls[0][1] as RequestInit;
+    expect(register.credentials).toBe("include");
+    expect(new Headers(register.headers).has("X-CSRF-TOKEN")).toBe(false);
+    expect(JSON.parse(String(register.body))).toEqual({
+      fullName: "María Prueba", email: "maria@example.com", password: "clave-segura-123",
+    });
+    const create = vi.mocked(fetch).mock.calls[2][1] as RequestInit;
+    expect(new Headers(create.headers).get("X-CSRF-TOKEN")).toBe("csrf-after-register");
+    expect(JSON.parse(String(create.body))).toEqual({
+      name: "Casa Prueba", currency: "EUR", timezone: "Europe/Madrid",
     });
   });
 });

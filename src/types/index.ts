@@ -46,7 +46,7 @@ export interface UserAccount {
   avatarUrl?: string;
   initials: string;
   color: string;
-  provider: "google";
+  provider: string;
 }
 
 export interface HouseholdSummary {

@@ -178,6 +178,22 @@ export const householdApi = {
     // Never reuse the anonymous response fetched before an OAuth round trip.
     me: () =>
       apiRequest<UserAccount>("/auth/me", { cache: "no-store" }, true, false),
+    register: (payload: { fullName: string; email: string; password: string }) =>
+      apiRequest<UserAccount>(
+        "/auth/register",
+        { method: "POST", body: JSON.stringify(payload) },
+        true,
+        false,
+        false,
+      ),
+    login: (payload: { email: string; password: string }) =>
+      apiRequest<UserAccount>(
+        "/auth/login",
+        { method: "POST", body: JSON.stringify(payload) },
+        true,
+        false,
+        false,
+      ),
     googleLoginUrl: (returnUrl: string) =>
       `${API_URL}/api/auth/google/login?returnUrl=${encodeURIComponent(returnUrl)}`,
     logout: () => apiRequest<void>("/auth/logout", { method: "POST" }),
