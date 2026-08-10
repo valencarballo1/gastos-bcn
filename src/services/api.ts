@@ -189,6 +189,7 @@ export async function apiRequest<T>(
   init: RequestInit = {},
   retryCsrf = true,
   notifyUnauthorized = true,
+  requireCsrf = true,
 ): Promise<T> {
   const method = (init.method ?? "GET").toUpperCase();
   const isMutation = !SAFE_METHODS.has(method);
@@ -199,7 +200,7 @@ export async function apiRequest<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  if (isMutation) {
+  if (isMutation && requireCsrf) {
     await fetchCsrfToken();
     headers.set(csrf!.headerName, csrf!.token);
   }
@@ -256,7 +257,7 @@ export async function apiRequest<T>(
     if (isCsrfError(error)) clearSessionState();
 
     if (retryCsrf && isMutation && isCsrfInvalid(error)) {
-      return apiRequest<T>(path, init, false, notifyUnauthorized);
+      return apiRequest<T>(path, init, false, notifyUnauthorized, requireCsrf);
     }
 
     throw error;

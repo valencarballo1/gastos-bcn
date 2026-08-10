@@ -10,7 +10,10 @@ import { Home, LoaderCircle, LogIn, Plus, RefreshCw } from "lucide-react";
 import { Modal } from "@/components/common/Modal";
 import { AppShell } from "@/components/layout/AppShell";
 import { ActivityPage } from "@/features/activity/ActivityPage";
-import { AuthScreen } from "@/features/auth/AuthScreen";
+import {
+  AuthScreen,
+  type PasswordAuthSubmission,
+} from "@/features/auth/AuthScreen";
 import { BalancesPage } from "@/features/balances/BalancesPage";
 import { CalendarPage } from "@/features/calendar/CalendarPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
@@ -264,6 +267,35 @@ export function HomeApp() {
     window.location.assign(householdApi.auth.googleLoginUrl(returnUrl));
   };
 
+  const passwordSignIn = async (submission: PasswordAuthSubmission) => {
+    const user = normalizeUser(
+      submission.mode === "register"
+        ? await householdApi.auth.register({
+            fullName: submission.fullName,
+            email: submission.email,
+            password: submission.password,
+          })
+        : await householdApi.auth.login({
+            email: submission.email,
+            password: submission.password,
+          }),
+    );
+
+    setAuthState({ status: "authenticated", user, csrfReady: false });
+    try {
+      await fetchCsrfToken();
+      setAuthState({ status: "authenticated", user, csrfReady: true });
+    } catch (reason) {
+      setAuthState({
+        status: "authenticated",
+        user,
+        csrfReady: false,
+        csrfError: errorMessage(reason),
+      });
+    }
+    navigatePath("/households", true);
+  };
+
   const retryCsrf = async () => {
     if (authState.status !== "authenticated") return;
     const user = authState.user;
@@ -326,7 +358,10 @@ export function HomeApp() {
 
   if (authState.status === "anonymous") {
     return (
-      <AuthScreen onGoogleSignIn={signIn} />
+      <AuthScreen
+        onGoogleSignIn={signIn}
+        onPasswordAuth={passwordSignIn}
+      />
     );
   }
 
@@ -541,7 +576,7 @@ function normalizeUser(user: UserAccount): UserAccount {
         .join("")
         .toUpperCase(),
     color: user.color || "#4F7C65",
-    provider: "google",
+    provider: user.provider || "password",
   };
 }
 
