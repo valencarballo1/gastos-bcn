@@ -1399,7 +1399,22 @@ button:disabled {
     background 140ms ease;
 }
 
-.field input::placeholder {
+.field select {
+  appearance: none;
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23657069' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 15px;
+}
+
+.field textarea {
+  min-height: 74px;
+  resize: vertical;
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
   color: #afb3ae;
 }
 
@@ -4602,14 +4617,19 @@ button:disabled {
 
   .modal-backdrop {
     align-items: stretch;
+    justify-items: stretch;
     padding: 0;
+    /* No blur here: backdrop-filter turns this box into the containing
+       block for any position:fixed descendant, which on real iOS Safari
+       can miscompute against the layout viewport instead of the visible
+       one (the sticky footer below relies on the true viewport). */
+    backdrop-filter: none;
+    background: rgba(24, 35, 29, 0.6);
   }
 
   .modal-panel {
     width: 100%;
     max-height: none;
-    height: 100vh;
-    height: 100dvh;
     border-radius: 0;
     animation: modal-in-mobile 220ms cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -4629,21 +4649,10 @@ button:disabled {
     padding-inline: 17px;
   }
 
-  .modal-body {
-    padding-bottom: 120px;
-  }
-
   .modal-body .form-actions {
-    position: fixed;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 2;
-    margin: 0;
+    bottom: -17px;
+    margin: 6px -17px -17px;
     padding: 14px 17px calc(14px + env(safe-area-inset-bottom));
-    border-top: 1px solid var(--line);
-    background: var(--surface);
-    box-shadow: 0 -10px 18px -12px rgba(36, 49, 42, 0.12);
   }
 
   .recurring-summary > div,
