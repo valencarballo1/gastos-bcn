@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { X } from "lucide-react";
 
 interface ModalProps {
@@ -12,6 +12,31 @@ interface ModalProps {
   width?: "sm" | "md" | "lg";
 }
 
+let scrollLockCount = 0;
+let previousBodyOverflow = "";
+let previousBodyPaddingRight = "";
+
+function lockBodyScroll() {
+  if (scrollLockCount === 0) {
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    previousBodyOverflow = document.body.style.overflow;
+    previousBodyPaddingRight = document.body.style.paddingRight;
+    document.body.style.overflow = "hidden";
+    if (scrollbarWidth > 0) {
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+    }
+  }
+  scrollLockCount += 1;
+}
+
+function unlockBodyScroll() {
+  scrollLockCount = Math.max(0, scrollLockCount - 1);
+  if (scrollLockCount === 0) {
+    document.body.style.overflow = previousBodyOverflow;
+    document.body.style.paddingRight = previousBodyPaddingRight;
+  }
+}
+
 export function Modal({
   open,
   title,
@@ -20,15 +45,33 @@ export function Modal({
   children,
   width = "md",
 }: ModalProps) {
+  useEffect(() => {
+    if (!open) return;
+    lockBodyScroll();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      unlockBodyScroll();
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, onClose]);
+
   if (!open) return null;
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+    <div
+      className="modal-backdrop"
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
       <section
         className={`modal-panel modal-${width}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
-        onMouseDown={(event) => event.stopPropagation()}
       >
         <header className="modal-header">
           <div>

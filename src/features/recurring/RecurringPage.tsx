@@ -253,6 +253,7 @@ function RecurringForm({
               <span>€</span>
               <input
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0"
                 placeholder="0,00"
@@ -265,6 +266,7 @@ function RecurringForm({
             <span>Día de vencimiento</span>
             <input
               type="number"
+              inputMode="numeric"
               min="1"
               max="28"
               value={dueDay}

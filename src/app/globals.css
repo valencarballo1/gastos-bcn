@@ -54,6 +54,7 @@ textarea {
 
 button {
   color: inherit;
+  touch-action: manipulation;
 }
 
 button:focus-visible,
@@ -561,6 +562,11 @@ button:disabled {
   transform: translateY(-1px);
 }
 
+.button:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: 60ms;
+}
+
 .button-primary {
   color: #fff;
   background: var(--sage-dark);
@@ -621,8 +627,8 @@ button:disabled {
 
 .icon-button {
   display: inline-grid;
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   place-items: center;
   flex: 0 0 auto;
   padding: 0;
@@ -631,12 +637,20 @@ button:disabled {
   color: var(--ink-soft);
   background: transparent;
   cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
 }
 
 .icon-button:hover {
   border-color: var(--line);
   color: var(--ink);
   background: var(--surface-soft);
+}
+
+.icon-button:active {
+  transform: scale(0.93);
 }
 
 .danger-button:hover {
@@ -1282,9 +1296,12 @@ button:disabled {
 }
 
 .modal-panel {
+  display: flex;
+  overflow: hidden;
   width: min(100%, 600px);
   max-height: calc(100vh - 48px);
-  overflow: hidden auto;
+  max-height: calc(100dvh - 48px);
+  flex-direction: column;
   border: 1px solid rgba(255, 255, 255, 0.7);
   border-radius: 24px;
   background: var(--surface);
@@ -1309,6 +1326,7 @@ button:disabled {
 
 .modal-header {
   display: flex;
+  flex: 0 0 auto;
   align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
@@ -1330,7 +1348,11 @@ button:disabled {
 }
 
 .modal-body {
+  overflow-y: auto;
+  flex: 1 1 auto;
   padding: 22px 24px 24px;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .app-form {
@@ -1599,6 +1621,15 @@ button:disabled {
   justify-content: flex-end;
   gap: 8px;
   padding-top: 3px;
+}
+
+.modal-body .form-actions {
+  position: sticky;
+  bottom: -24px;
+  z-index: 1;
+  margin: 6px -24px -24px;
+  padding: 16px 24px calc(16px + env(safe-area-inset-bottom));
+  background: linear-gradient(0deg, var(--surface) 70%, rgba(255, 255, 255, 0));
 }
 
 .color-field {
@@ -2371,6 +2402,12 @@ button:disabled {
   color: #fff;
   background: #fff;
   cursor: pointer;
+  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+
+.round-check:active,
+.task-complete-button:active {
+  transform: scale(0.88);
 }
 
 .is-purchased .round-check,
@@ -3581,6 +3618,11 @@ button:disabled {
   color: #fff;
   background: transparent;
   cursor: pointer;
+  transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+
+.receipt-check:active {
+  transform: scale(0.88);
 }
 
 .receipt-item.is-purchased .receipt-check {
@@ -4545,6 +4587,14 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 
+  .field input:not([type="color"]),
+  .field select,
+  .field textarea,
+  .search-field input,
+  .select-field select {
+    font-size: 16px;
+  }
+
   .modal-backdrop {
     align-items: flex-end;
     padding: 0;
@@ -4553,11 +4603,17 @@ button:disabled {
   .modal-panel {
     width: 100%;
     max-height: 92vh;
+    max-height: 92dvh;
     border-radius: 23px 23px 0 0;
   }
 
   .modal-header,
   .modal-body {
+    padding-inline: 17px;
+  }
+
+  .modal-body .form-actions {
+    margin-inline: -17px;
     padding-inline: 17px;
   }
 
@@ -5068,3 +5124,30 @@ button:disabled {
   .household-picker-grid,
   .category-create-form { grid-template-columns: 1fr; }
 }
+
+/* Thumb-reachable primary action on mobile */
+@media (max-width: 900px) {
+  .page-header-action {
+    position: fixed;
+    right: max(16px, env(safe-area-inset-right));
+    bottom: calc(66px + env(safe-area-inset-bottom) + 16px);
+    z-index: 55;
+    width: auto;
+  }
+
+  .page-header-action .button {
+    width: auto;
+    min-height: 52px;
+    padding: 0 22px 0 19px;
+    border-radius: 999px;
+    font-size: 13px;
+    box-shadow:
+      0 16px 32px rgba(35, 61, 48, 0.32),
+      0 4px 12px rgba(35, 61, 48, 0.2);
+  }
+
+  .page-header-action .button:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+}
+

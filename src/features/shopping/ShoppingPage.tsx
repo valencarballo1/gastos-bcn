@@ -358,6 +358,7 @@ function ShoppingItemPriceForm({
               autoFocus
               required
               type="number"
+              inputMode="decimal"
               min="0"
               step="0.01"
               placeholder="0,00"
@@ -456,6 +457,7 @@ function ShoppingItemForm({
             <span>Cantidad</span>
             <input
               type="number"
+              inputMode="decimal"
               min="0.1"
               step="0.1"
               value={quantity}
@@ -504,6 +506,7 @@ function ShoppingItemForm({
               <span>€</span>
               <input
                 type="number"
+                inputMode="decimal"
                 step="0.01"
                 min="0"
                 placeholder="Opcional"
@@ -595,6 +598,7 @@ function FinishShoppingForm({
             <input
               autoFocus
               type="number"
+              inputMode="decimal"
               step="0.01"
               min="0.01"
               value={amount}
