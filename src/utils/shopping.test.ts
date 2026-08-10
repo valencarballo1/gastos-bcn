@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { openShoppingList, openShoppingListsFirst } from "./shopping";
+import {
+  openShoppingList,
+  openShoppingListsFirst,
+  shoppingItemPrice,
+} from "./shopping";
 import type { ShoppingList } from "@/types";
 
 describe("lista de compra activa", () => {
@@ -13,6 +17,19 @@ describe("lista de compra activa", () => {
 
   it("no reutiliza una lista cerrada", () => {
     expect(openShoppingList([list("old", "closed")])).toBeUndefined();
+  });
+});
+
+describe("precio de un producto comprado", () => {
+  it("prioriza el precio real sobre el estimado", () => {
+    expect(shoppingItemPrice({ actualPrice: 4.25, estimatedPrice: 3.5 })).toBe(
+      4.25,
+    );
+  });
+
+  it("usa el estimado hasta que se carga un precio real", () => {
+    expect(shoppingItemPrice({ estimatedPrice: 3.5 })).toBe(3.5);
+    expect(shoppingItemPrice({})).toBe(0);
   });
 });
 

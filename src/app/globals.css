@@ -3643,6 +3643,21 @@ button:disabled {
   font-weight: 750;
 }
 
+.receipt-price-button {
+  padding: 5px 4px;
+  border: 0;
+  border-radius: 6px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.receipt-price-button:hover {
+  color: #557262;
+  background: var(--sage-soft);
+}
+
 .receipt-remove {
   display: grid;
   width: 28px;

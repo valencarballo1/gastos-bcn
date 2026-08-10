@@ -18,7 +18,7 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { errorMessage } from "@/services/api";
 import type { HouseholdData, ShoppingItem } from "@/types";
 import { formatCurrency, formatLongDate } from "@/utils/format";
-import { openShoppingList } from "@/utils/shopping";
+import { openShoppingList, shoppingItemPrice } from "@/utils/shopping";
 
 interface ShoppingPageProps {
   data: HouseholdData;
@@ -26,6 +26,7 @@ interface ShoppingPageProps {
     item: Omit<ShoppingItem, "id" | "createdAt" | "purchased" | "rowVersion">,
   ) => Promise<unknown>;
   toggleShoppingItem: (id: string) => Promise<unknown>;
+  updateShoppingItemPrice: (id: string, actualPrice: number) => Promise<unknown>;
   removeShoppingItem: (id: string) => Promise<unknown>;
   finalizeShopping: (amount: number, paidByMemberId: string) => Promise<unknown>;
 }
@@ -34,11 +35,13 @@ export function ShoppingPage({
   data,
   addShoppingItem,
   toggleShoppingItem,
+  updateShoppingItemPrice,
   removeShoppingItem,
   finalizeShopping,
 }: ShoppingPageProps) {
   const [addOpen, setAddOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
+  const [pricedItem, setPricedItem] = useState<ShoppingItem | null>(null);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("Todas");
   const list = openShoppingList(data.shoppingLists) ?? data.shoppingLists[0];
@@ -175,11 +178,22 @@ export function ShoppingPage({
                   <span className="receipt-quantity">
                     {item.quantity} {item.unit}
                   </span>
-                  <span className="receipt-price">
-                    {item.estimatedPrice
-                      ? formatCurrency(item.estimatedPrice)
-                      : "—"}
-                  </span>
+                  {item.purchased ? (
+                    <button
+                      className="receipt-price receipt-price-button"
+                      onClick={() => setPricedItem(item)}
+                    >
+                      {item.actualPrice != null
+                        ? formatCurrency(item.actualPrice)
+                        : "Agregar precio"}
+                    </button>
+                  ) : (
+                    <span className="receipt-price">
+                      {item.estimatedPrice
+                        ? formatCurrency(item.estimatedPrice)
+                        : "—"}
+                    </span>
+                  )}
                   <Avatar member={member} size="sm" />
                   <button
                     className="receipt-remove"
@@ -238,7 +252,7 @@ export function ShoppingPage({
               <dd>
                 {formatCurrency(
                   readyToFinalize.reduce(
-                    (sum, item) => sum + (item.estimatedPrice ?? 0),
+                    (sum, item) => sum + shoppingItemPrice(item),
                     0,
                   ),
                 )}
@@ -275,7 +289,7 @@ export function ShoppingPage({
         onClose={() => setFinishOpen(false)}
         data={data}
         suggestedAmount={readyToFinalize.reduce(
-          (sum, item) => sum + (item.estimatedPrice ?? 0),
+          (sum, item) => sum + shoppingItemPrice(item),
           0,
         )}
         itemCount={readyToFinalize.length}
@@ -284,7 +298,85 @@ export function ShoppingPage({
           setFinishOpen(false);
         }}
       />
+      <ShoppingItemPriceForm
+        key={pricedItem?.id ?? "closed"}
+        item={pricedItem}
+        onClose={() => setPricedItem(null)}
+        onSubmit={async (actualPrice) => {
+          if (!pricedItem) return;
+          await updateShoppingItemPrice(pricedItem.id, actualPrice);
+          setPricedItem(null);
+        }}
+      />
     </div>
+  );
+}
+
+function ShoppingItemPriceForm({
+  item,
+  onClose,
+  onSubmit,
+}: {
+  item: ShoppingItem | null;
+  onClose: () => void;
+  onSubmit: (actualPrice: number) => Promise<unknown>;
+}) {
+  const [price, setPrice] = useState(
+    item?.actualPrice != null ? String(item.actualPrice) : "",
+  );
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    const actualPrice = Number(price);
+    if (!price || !Number.isFinite(actualPrice) || actualPrice < 0) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      await onSubmit(actualPrice);
+    } catch (reason) {
+      setError(errorMessage(reason));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={Boolean(item)}
+      onClose={onClose}
+      title={`Precio de ${item?.name ?? "producto"}`}
+      subtitle="Cargá el precio real que figura en el ticket."
+    >
+      <form className="app-form" onSubmit={(event) => void submit(event)}>
+        <label className="field">
+          <span>Precio real</span>
+          <div className="input-prefix">
+            <span>€</span>
+            <input
+              autoFocus
+              required
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0,00"
+              value={price}
+              onChange={(event) => setPrice(event.target.value)}
+            />
+          </div>
+        </label>
+        {error && <p className="form-error">{error}</p>}
+        <div className="form-actions">
+          <button type="button" className="button button-ghost" onClick={onClose}>
+            Cancelar
+          </button>
+          <button className="button button-primary" type="submit" disabled={submitting}>
+            {submitting ? "Guardando…" : "Guardar precio"}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

@@ -10,3 +10,10 @@ export function openShoppingListsFirst(
 ) {
   return Number(right.status === "open") - Number(left.status === "open");
 }
+
+export function shoppingItemPrice(item: {
+  actualPrice?: number;
+  estimatedPrice?: number;
+}) {
+  return item.actualPrice ?? item.estimatedPrice ?? 0;
+}

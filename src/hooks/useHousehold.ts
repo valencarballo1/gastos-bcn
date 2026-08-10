@@ -457,6 +457,23 @@ export function useHousehold(enabled: boolean, requestedHouseholdId?: string) {
           ),
         );
       },
+      updateShoppingItemPrice: (itemId: string, actualPrice: number) => {
+        const item = activeList?.items.find(
+          (candidate) => candidate.id === itemId,
+        );
+        if (!activeList?.id || !item?.purchased) return Promise.resolve();
+        return runMutation(() =>
+          householdApi.shopping.updateItem(
+            householdId,
+            activeList.id,
+            itemId,
+            {
+              actualPrice,
+              rowVersion: item.rowVersion,
+            },
+          ),
+        );
+      },
       removeShoppingItem: (itemId: string) => {
         const item = activeList?.items.find(
           (candidate) => candidate.id === itemId,
