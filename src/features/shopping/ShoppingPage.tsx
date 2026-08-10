@@ -5,6 +5,7 @@ import {
   Check,
   CircleDollarSign,
   ListFilter,
+  ListPlus,
   Plus,
   ReceiptText,
   Search,
@@ -395,7 +396,9 @@ function ShoppingItemForm({
   const shoppingCategories = data.categories.filter(
     (category) => category.type === "shopping",
   );
+  const [mode, setMode] = useState<"single" | "bulk">("single");
   const [name, setName] = useState("");
+  const [namesText, setNamesText] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [unit, setUnit] = useState("u");
   const [categoryId, setCategoryId] = useState(
@@ -409,8 +412,48 @@ function ShoppingItemForm({
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const bulkNames = namesText
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const categoryName =
+    shoppingCategories.find((item) => item.id === categoryId)?.name ?? "Otros";
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (submitting) return;
+
+    if (mode === "bulk") {
+      if (!bulkNames.length) {
+        setError("Escribí al menos un producto, separado por comas.");
+        return;
+      }
+      setSubmitting(true);
+      setError("");
+      try {
+        await Promise.all(
+          bulkNames.map((productName) =>
+            onSubmit({
+              name: productName,
+              quantity: 1,
+              unit: "u",
+              categoryId,
+              category: categoryName,
+              addedByMemberId: memberId,
+              priority: "normal",
+              estimatedPrice: undefined,
+            }),
+          ),
+        );
+        setNamesText("");
+      } catch (reason) {
+        setError(errorMessage(reason));
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     if (!name.trim()) return;
     setSubmitting(true);
     setError("");
@@ -420,9 +463,7 @@ function ShoppingItemForm({
         quantity: Number(quantity),
         unit,
         categoryId,
-        category:
-          shoppingCategories.find((item) => item.id === categoryId)?.name ??
-          "Otros",
+        category: categoryName,
         addedByMemberId: memberId,
         priority,
         estimatedPrice: estimate ? Number(estimate) : undefined,
@@ -440,38 +481,77 @@ function ShoppingItemForm({
       open={open}
       onClose={onClose}
       title="Agregar al ticket"
-      subtitle="Aparecerá al instante en la lista conjunta."
+      subtitle={
+        mode === "bulk"
+          ? "Elegí la categoría y escribí los productos separados por coma: se agregan todos con cantidad 1."
+          : "Aparecerá al instante en la lista conjunta."
+      }
     >
       <form className="app-form" onSubmit={(event) => void submit(event)}>
-        <label className="field">
-          <span>Producto</span>
-          <input
-            autoFocus
-            placeholder="Ej. Café"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
-        </label>
-        <div className="form-grid">
+        <div className="segmented-control invitation-mode">
+          <button
+            type="button"
+            className={mode === "single" ? "active" : ""}
+            onClick={() => setMode("single")}
+          >
+            <Plus size={16} /> Un producto
+          </button>
+          <button
+            type="button"
+            className={mode === "bulk" ? "active" : ""}
+            onClick={() => setMode("bulk")}
+          >
+            <ListPlus size={16} /> Varios a la vez
+          </button>
+        </div>
+
+        {mode === "single" ? (
           <label className="field">
-            <span>Cantidad</span>
+            <span>Producto</span>
             <input
-              type="number"
-              inputMode="decimal"
-              min="0.1"
-              step="0.1"
-              value={quantity}
-              onChange={(event) => setQuantity(event.target.value)}
+              autoFocus
+              placeholder="Ej. Café"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
             />
           </label>
+        ) : (
           <label className="field">
-            <span>Unidad</span>
-            <select value={unit} onChange={(event) => setUnit(event.target.value)}>
-              {["u", "kg", "g", "l", "ml", "paq."].map((value) => (
-                <option key={value}>{value}</option>
-              ))}
-            </select>
+            <span>Productos (separados por coma)</span>
+            <textarea
+              autoFocus
+              rows={3}
+              placeholder="Ej. Champú, acondicionador, jabón"
+              value={namesText}
+              onChange={(event) => setNamesText(event.target.value)}
+            />
           </label>
+        )}
+
+        <div className="form-grid">
+          {mode === "single" && (
+            <>
+              <label className="field">
+                <span>Cantidad</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min="0.1"
+                  step="0.1"
+                  value={quantity}
+                  onChange={(event) => setQuantity(event.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span>Unidad</span>
+                <select value={unit} onChange={(event) => setUnit(event.target.value)}>
+                  {["u", "kg", "g", "l", "ml", "paq."].map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
           <label className="field">
             <span>Categoría</span>
             <select
@@ -500,41 +580,55 @@ function ShoppingItemForm({
                 ))}
             </select>
           </label>
-          <label className="field">
-            <span>Precio estimado</span>
-            <div className="input-prefix">
-              <span>€</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                placeholder="Opcional"
-                value={estimate}
-                onChange={(event) => setEstimate(event.target.value)}
-              />
-            </div>
-          </label>
-          <label className="field">
-            <span>Prioridad</span>
-            <select
-              value={priority}
-              onChange={(event) =>
-                setPriority(event.target.value as ShoppingItem["priority"])
-              }
-            >
-              <option value="normal">Normal</option>
-              <option value="high">Prioritario</option>
-            </select>
-          </label>
+          {mode === "single" && (
+            <>
+              <label className="field">
+                <span>Precio estimado</span>
+                <div className="input-prefix">
+                  <span>€</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    min="0"
+                    placeholder="Opcional"
+                    value={estimate}
+                    onChange={(event) => setEstimate(event.target.value)}
+                  />
+                </div>
+              </label>
+              <label className="field">
+                <span>Prioridad</span>
+                <select
+                  value={priority}
+                  onChange={(event) =>
+                    setPriority(event.target.value as ShoppingItem["priority"])
+                  }
+                >
+                  <option value="normal">Normal</option>
+                  <option value="high">Prioritario</option>
+                </select>
+              </label>
+            </>
+          )}
         </div>
         {error && <p className="form-error">{error}</p>}
         <div className="form-actions">
           <button type="button" className="button button-ghost" onClick={onClose}>
             Cancelar
           </button>
-          <button className="button button-primary" type="submit" disabled={submitting}>
-            {submitting ? "Agregando…" : "Agregar al ticket"}
+          <button
+            className="button button-primary"
+            type="submit"
+            disabled={submitting || (mode === "bulk" && !bulkNames.length)}
+          >
+            {submitting
+              ? "Agregando…"
+              : mode === "bulk"
+                ? bulkNames.length
+                  ? `Agregar ${bulkNames.length} producto${bulkNames.length === 1 ? "" : "s"}`
+                  : "Agregar productos"
+                : "Agregar al ticket"}
           </button>
         </div>
       </form>
