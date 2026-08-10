@@ -478,6 +478,7 @@ export function HomeApp() {
           data={data}
           addShoppingItem={actions.addShoppingItem}
           toggleShoppingItem={actions.toggleShoppingItem}
+          updateShoppingItemPrice={actions.updateShoppingItemPrice}
           removeShoppingItem={actions.removeShoppingItem}
           finalizeShopping={actions.finalizeShopping}
         />
