@@ -46,6 +46,12 @@ describe("parseAmount", () => {
     expect(parseAmount("1.234")).toBe(1234);
   });
 
+  it("trata como decimales las tres cifras que siguen a un cero", () => {
+    // Un peso de ticket: 0,596 kg no son 596 kg.
+    expect(parseAmount("0,596")).toBe(0.596);
+    expect(parseAmount("0.500")).toBe(0.5);
+  });
+
   it("ignora el símbolo de moneda y los espacios", () => {
     expect(parseAmount(" 42,17 € ")).toBe(42.17);
   });

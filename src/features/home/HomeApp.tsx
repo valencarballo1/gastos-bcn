@@ -18,6 +18,7 @@ import { BalancesPage } from "@/features/balances/BalancesPage";
 import { CalendarPage } from "@/features/calendar/CalendarPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { ExpensesPage } from "@/features/expenses/ExpensesPage";
+import { InboxPage } from "@/features/inbox/InboxPage";
 import { MembersPage } from "@/features/members/MembersPage";
 import { RecurringPage } from "@/features/recurring/RecurringPage";
 import { ReportsPage } from "@/features/reports/ReportsPage";
@@ -69,6 +70,7 @@ type AuthState =
 const routeSegments: Record<ViewKey, string> = {
   dashboard: "dashboard",
   expenses: "expenses",
+  inbox: "inbox",
   recurring: "recurring-expenses",
   balances: "balances",
   shopping: "shopping",
@@ -414,6 +416,10 @@ export function HomeApp() {
   return (
     <AppShell
       activeView={route.view}
+      pendingReceipts={
+        data.mailReceipts.filter((receipt) => receipt.status === "pending")
+          .length
+      }
       onNavigate={navigateView}
       household={data.household}
       members={data.members}
@@ -461,6 +467,15 @@ export function HomeApp() {
           addExpense={actions.addExpense}
           updateExpense={actions.updateExpense}
           removeExpense={actions.removeExpense}
+        />
+      )}
+      {route.view === "inbox" && (
+        <InboxPage
+          data={data}
+          addExpense={actions.addExpense}
+          confirmMailReceipt={actions.confirmMailReceipt}
+          discardMailReceipt={actions.discardMailReceipt}
+          onOpenSettings={() => navigateView("settings")}
         />
       )}
       {route.view === "recurring" && (
@@ -518,6 +533,8 @@ export function HomeApp() {
           updateHousehold={actions.updateHousehold}
           createCategory={actions.createCategory}
           removeCategory={actions.removeCategory}
+          loadMailboxToken={actions.mailboxToken}
+          rotateMailboxToken={actions.rotateMailboxToken}
         />
       )}
 

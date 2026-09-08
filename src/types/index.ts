@@ -1,6 +1,7 @@
 export type ViewKey =
   | "dashboard"
   | "expenses"
+  | "inbox"
   | "recurring"
   | "balances"
   | "shopping"
@@ -202,6 +203,24 @@ export interface Activity {
   date: string;
 }
 
+/**
+ * Un correo con pinta de ticket esperando revisión. Llega con el texto tal cual
+ * lo mandó el comercio; interpretarlo es tarea de `lib/receipts`.
+ */
+export interface MailReceipt {
+  id: string;
+  householdId: string;
+  messageId: string;
+  from: string;
+  subject: string;
+  body: string;
+  receivedAt: string;
+  createdAt: string;
+  status: "pending" | "confirmed" | "discarded";
+  expenseId?: string;
+  rowVersion?: string;
+}
+
 export interface HouseholdData {
   household: Household;
   members: HouseholdMember[];
@@ -212,6 +231,7 @@ export interface HouseholdData {
   tasks: HouseholdTask[];
   shoppingLists: ShoppingList[];
   activities: Activity[];
+  mailReceipts: MailReceipt[];
 }
 
 export interface BalanceSummary {

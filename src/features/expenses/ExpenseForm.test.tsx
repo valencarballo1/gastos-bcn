@@ -136,5 +136,6 @@ function householdData(): HouseholdData {
     tasks: [],
     shoppingLists: [],
     activities: [],
+    mailReceipts: [],
   };
 }

@@ -68,6 +68,24 @@ redirigir a esa URL.
 - Las rutas de la SPA siguen el formato `/h/:householdId/...` y
   `/invite/:token`.
 
+## Importes con decimales
+
+Los campos de dinero **no** usan `<input type="number">`: en España el teclado
+del móvil ofrece coma decimal y ese control descarta el valor, así que el campo
+quedaba vacío. Se usa `AmountInput` (`src/components/common/AmountInput.tsx`),
+que es texto con `inputMode="decimal"`, y `parseAmount` de `src/lib/money.ts`,
+que entiende `12,50`, `12.50`, `1.234,56` y `1,234.56`. Cualquier campo de
+importe nuevo debería usar los dos.
+
+## Tickets por correo
+
+Las facturas y los tickets de Gmail pueden llegar a la bandeja de la app sin
+darle a Casa Clara acceso al correo: un Apps Script que corre en la cuenta de la
+persona manda los mensajes a la API y la app propone el gasto para revisar.
+
+Ver [`docs/tickets-por-correo.md`](docs/tickets-por-correo.md) y
+[`docs/gmail-apps-script.gs`](docs/gmail-apps-script.gs).
+
 ## Validación
 
 ```bash

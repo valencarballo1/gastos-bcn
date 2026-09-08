@@ -36,11 +36,14 @@ export function parseAmount(
     normalized = cleaned;
   } else {
     const decimals = cleaned.slice(lastSeparator + 1);
+    const whole = cleaned.slice(0, lastSeparator).replace(/[.,]/g, "");
     // Tres cifras después del último separador ("1.234", "1,234") son un
     // separador de miles, no decimales: nadie escribe milésimas de euro.
-    normalized = /^\d{3}$/.test(decimals)
-      ? cleaned.replace(/[.,]/g, "")
-      : `${cleaned.slice(0, lastSeparator).replace(/[.,]/g, "")}.${decimals}`;
+    // Salvo que delante solo haya un cero: "0,596" son 596 gramos, no 596.
+    normalized =
+      /^\d{3}$/.test(decimals) && whole !== "0" && whole !== ""
+        ? cleaned.replace(/[.,]/g, "")
+        : `${whole}.${decimals}`;
   }
 
   const parsed = Number(normalized);

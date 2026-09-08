@@ -5600,3 +5600,254 @@ button:disabled {
 .payer-row {
   mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent);
 }
+
+/* ---------------------------------------------------------------------------
+   Bandeja de tickets que llegan por correo
+   --------------------------------------------------------------------------- */
+
+.nav-badge {
+  min-width: 17px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 750;
+  line-height: 15px;
+  text-align: center;
+  background: var(--coral);
+}
+
+.sidebar-nav .nav-badge {
+  margin-left: auto;
+}
+
+.bottom-nav .nav-badge {
+  position: absolute;
+  top: 4px;
+  right: 50%;
+  transform: translateX(18px);
+}
+
+.bottom-nav button {
+  position: relative;
+}
+
+.inbox-list {
+  display: grid;
+  gap: 12px;
+}
+
+.inbox-card {
+  display: grid;
+  gap: 10px;
+  padding: 15px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.inbox-card > header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 11px;
+  align-items: center;
+}
+
+.inbox-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--sage-dark);
+  background: var(--sage-soft);
+}
+
+.inbox-card-main {
+  min-width: 0;
+}
+
+.inbox-card-main strong,
+.inbox-card-main span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-card-main strong {
+  font-size: 13px;
+}
+
+.inbox-card-main span {
+  margin-top: 2px;
+  color: var(--ink-soft);
+  font-size: 10px;
+}
+
+.inbox-amount {
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+.inbox-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: 10px;
+  color: #7d4232;
+  font-size: 10px;
+  line-height: 1.4;
+  background: var(--coral-soft);
+}
+
+.inbox-warning svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.inbox-toggle {
+  justify-self: start;
+}
+
+.inbox-toggle .rotated {
+  transform: rotate(180deg);
+}
+
+.inbox-lines {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 4px 0;
+  border-top: 1px dashed var(--line);
+  border-bottom: 1px dashed var(--line);
+  list-style: none;
+}
+
+.inbox-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 2px;
+  font-size: 11px;
+}
+
+.inbox-lines li span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-soft);
+}
+
+.inbox-lines em {
+  color: var(--ink);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.inbox-card > footer {
+  display: flex;
+  gap: 8px;
+}
+
+/* Ajustes: conexión con Gmail */
+
+.settings-mailbox-card {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-hint {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.settings-hint-small {
+  font-size: 10px;
+}
+
+.settings-steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.settings-steps code,
+.settings-token code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  color: var(--ink);
+  font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 10px;
+  background: var(--surface-soft);
+}
+
+.settings-token-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-token {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface-soft);
+}
+
+.settings-token > span:first-child {
+  min-width: 84px;
+  color: #58655e;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.settings-token code {
+  min-width: 0;
+  flex: 1;
+  overflow-x: auto;
+  white-space: nowrap;
+  background: transparent;
+}
+
+.settings-token > div {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.settings-token em {
+  color: var(--sage);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 8px;
+}
+
+@media (max-width: 640px) {
+  .inbox-card > footer {
+    display: grid;
+  }
+
+  .inbox-amount {
+    font-size: 14px;
+  }
+}
