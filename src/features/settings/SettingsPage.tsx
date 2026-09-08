@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { PageHeader } from "@/components/common/PageHeader";
+import { MailboxCard } from "@/features/settings/MailboxCard";
 import { errorMessage } from "@/services/api";
 import type { Category, Household, HouseholdData } from "@/types";
 
@@ -22,6 +23,8 @@ export function SettingsPage({
   updateHousehold,
   createCategory,
   removeCategory,
+  loadMailboxToken,
+  rotateMailboxToken,
 }: {
   data: HouseholdData;
   canManage: boolean;
@@ -34,6 +37,8 @@ export function SettingsPage({
     payload: Omit<Category, "id" | "rowVersion">,
   ) => Promise<unknown>;
   removeCategory: (categoryId: string) => Promise<unknown>;
+  loadMailboxToken: () => Promise<{ token?: string; configured: boolean }>;
+  rotateMailboxToken: () => Promise<{ token: string; configured: boolean }>;
 }) {
   const [name, setName] = useState(data.household.name);
   const [timezone, setTimezone] = useState(data.household.timezone);
@@ -253,6 +258,13 @@ export function SettingsPage({
             </form>
           )}
         </article>
+
+        <MailboxCard
+          householdId={data.household.id}
+          canManage={canManage}
+          loadToken={loadMailboxToken}
+          rotateToken={rotateMailboxToken}
+        />
 
         <article className="settings-card">
           <header className="section-card-header">

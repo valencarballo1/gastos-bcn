@@ -6,6 +6,7 @@ import type {
   HouseholdMember,
   HouseholdSummary,
   HouseholdTask,
+  MailReceipt,
   RecurringExpense,
   Settlement,
   ShoppingItem,
@@ -630,6 +631,42 @@ export const householdApi = {
       apiRequest<unknown>(
         `/hogares/${householdId}/tareas/${taskId}/comentarios`,
         { method: "POST", body: JSON.stringify({ comment: text }) },
+      ),
+  },
+
+  mailbox: {
+    list: (householdId: string, estado: string = "pending") =>
+      apiRequest<MailReceipt[]>(
+        apiPath(`/hogares/${householdId}/buzon`, { estado }),
+      ),
+    confirm: (
+      householdId: string,
+      receiptId: string,
+      payload: { expenseId?: string; rowVersion?: string } = {},
+    ) =>
+      apiRequest<MailReceipt>(
+        `/hogares/${householdId}/buzon/${receiptId}/confirmar`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            expenseId: numericId(payload.expenseId),
+            rowVersion: payload.rowVersion,
+          }),
+        },
+      ),
+    discard: (householdId: string, receiptId: string, rowVersion?: string) =>
+      apiRequest<MailReceipt>(`/hogares/${householdId}/buzon/${receiptId}`, {
+        method: "DELETE",
+        body: JSON.stringify({ rowVersion }),
+      }),
+    token: (householdId: string) =>
+      apiRequest<{ token?: string; configured: boolean }>(
+        `/hogares/${householdId}/buzon/token`,
+      ),
+    rotateToken: (householdId: string) =>
+      apiRequest<{ token: string; configured: boolean }>(
+        `/hogares/${householdId}/buzon/token`,
+        { method: "POST" },
       ),
   },
 

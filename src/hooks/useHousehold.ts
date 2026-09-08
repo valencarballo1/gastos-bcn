@@ -24,6 +24,7 @@ import type {
   HouseholdMember,
   HouseholdSummary,
   HouseholdTask,
+  MailReceipt,
   RecurringExpense,
   Settlement,
   ShoppingItem,
@@ -62,6 +63,7 @@ export const MUTATION_INVALIDATIONS = {
     "activity",
   ],
   member: ["members", "selectors", "dashboard"],
+  mailbox: ["mailbox", "expenses", "balances", "dashboard", "activity"],
 } as const;
 
 const emptyShoppingList: ShoppingList = {
@@ -88,6 +90,7 @@ const emptyData: HouseholdData = {
   tasks: [],
   shoppingLists: [emptyShoppingList],
   activities: [],
+  mailReceipts: [],
 };
 
 type RemoteState = "idle" | "loading" | "ready" | "error";
@@ -159,6 +162,7 @@ export function useHousehold(enabled: boolean, requestedHouseholdId?: string) {
         }),
         householdApi.balances.get(householdId),
         householdApi.invitations.list(householdId),
+        householdApi.mailbox.list(householdId),
       ]);
 
       if (version !== requestVersion.current) return;
@@ -202,6 +206,11 @@ export function useHousehold(enabled: boolean, requestedHouseholdId?: string) {
       const inviteList = settledArray<HouseholdInvitation>(reads[11]).map(
         (invite) => normalizeInvitation(invite, household.id),
       );
+      // La bandeja es opcional: una API sin el endpoint de buzón sigue
+      // funcionando, solo que sin tickets por correo.
+      const mailReceipts = settledArray<MailReceipt>(reads[12]).map(
+        (receipt) => normalizeMailReceipt(receipt, household.id),
+      );
 
       setData({
         household,
@@ -215,6 +224,7 @@ export function useHousehold(enabled: boolean, requestedHouseholdId?: string) {
           ? shoppingLists
           : [{ ...emptyShoppingList, householdId: household.id }],
         activities,
+        mailReceipts,
       });
       setDashboard(
         reads[1].status === "fulfilled" ? reads[1].value : null,
@@ -370,6 +380,57 @@ export function useHousehold(enabled: boolean, requestedHouseholdId?: string) {
         runMutation(() =>
           householdApi.expenses.create(householdId, expense),
         ),
+      updateExpense: (
+        expenseId: string,
+        expense: Omit<
+          Expense,
+          "id" | "householdId" | "createdAt" | "rowVersion"
+        > & { rowVersion?: string },
+      ) => {
+        const current = data.expenses.find((item) => item.id === expenseId);
+        return runMutation(() =>
+          householdApi.expenses.update(householdId, expenseId, {
+            ...expense,
+            rowVersion: expense.rowVersion ?? current?.rowVersion,
+          }),
+        );
+      },
+      removeExpense: (expenseId: string) => {
+        const current = data.expenses.find((item) => item.id === expenseId);
+        return runMutation(() =>
+          householdApi.expenses.cancel(
+            householdId,
+            expenseId,
+            current?.rowVersion,
+          ),
+        );
+      },
+      confirmMailReceipt: (receiptId: string, expenseId?: string) => {
+        const receipt = data.mailReceipts.find(
+          (item) => item.id === receiptId,
+        );
+        return runMutation(() =>
+          householdApi.mailbox.confirm(householdId, receiptId, {
+            expenseId,
+            rowVersion: receipt?.rowVersion,
+          }),
+        );
+      },
+      discardMailReceipt: (receiptId: string) => {
+        const receipt = data.mailReceipts.find(
+          (item) => item.id === receiptId,
+        );
+        return runMutation(() =>
+          householdApi.mailbox.discard(
+            householdId,
+            receiptId,
+            receipt?.rowVersion,
+          ),
+        );
+      },
+      mailboxToken: () => householdApi.mailbox.token(householdId),
+      rotateMailboxToken: () =>
+        runMutation(() => householdApi.mailbox.rotateToken(householdId), false),
       addSettlement: (
         settlement: Omit<
           Settlement,
@@ -582,6 +643,8 @@ export function useHousehold(enabled: boolean, requestedHouseholdId?: string) {
     }),
     [
       activeList,
+      data.expenses,
+      data.mailReceipts,
       data.members,
       data.recurringExpenses,
       data.tasks,
@@ -696,6 +759,22 @@ function normalizeCategory(input: Category): Category {
     id: stringId(input.id),
     color: input.color || "#4F7C65",
     type: input.type ?? "expense",
+  };
+}
+
+function normalizeMailReceipt(
+  input: MailReceipt,
+  householdId: string,
+): MailReceipt {
+  return {
+    ...input,
+    id: stringId(input.id),
+    householdId,
+    expenseId: input.expenseId ? stringId(input.expenseId) : undefined,
+    status: input.status ?? "pending",
+    body: input.body ?? "",
+    from: input.from ?? "",
+    subject: input.subject ?? "",
   };
 }
 

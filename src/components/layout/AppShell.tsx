@@ -11,6 +11,7 @@ import {
   CircleDollarSign,
   Clock3,
   Home,
+  Inbox,
   Menu,
   MoreHorizontal,
   ReceiptText,
@@ -41,6 +42,7 @@ interface NavItem {
 const primaryNav: NavItem[] = [
   { id: "dashboard", label: "Inicio", icon: Home },
   { id: "expenses", label: "Gastos", icon: ReceiptText },
+  { id: "inbox", label: "Bandeja", icon: Inbox },
   { id: "recurring", label: "Gastos fijos", icon: Repeat2 },
   { id: "balances", label: "Balances", icon: CircleDollarSign },
   { id: "shopping", label: "Supermercado", icon: ShoppingBasket },
@@ -59,6 +61,8 @@ const allNav = [...primaryNav, ...secondaryNav];
 
 interface AppShellProps {
   activeView: ViewKey;
+  /** Tickets de correo esperando revisión, para el aviso del menú. */
+  pendingReceipts?: number;
   onNavigate: (view: ViewKey) => void;
   household: Household;
   members: HouseholdMember[];
@@ -73,6 +77,7 @@ interface AppShellProps {
 
 export function AppShell({
   activeView,
+  pendingReceipts = 0,
   onNavigate,
   household,
   members,
@@ -84,6 +89,7 @@ export function AppShell({
   syncing = false,
   children,
 }: AppShellProps) {
+  const badges: Partial<Record<ViewKey, number>> = { inbox: pendingReceipts };
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [householdMenuOpen, setHouseholdMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
@@ -259,19 +265,18 @@ export function AppShell({
       </div>
 
       <nav className="bottom-nav" aria-label="Navegación móvil">
-        {[
-          primaryNav[0],
-          primaryNav[1],
-          primaryNav[4],
-          primaryNav[5],
-        ].map((item) => (
-          <NavButton
-            key={item.id}
-            item={item}
-            active={activeView === item.id}
-            onClick={() => navigate(item.id)}
-          />
-        ))}
+        {(["dashboard", "expenses", "inbox", "shopping"] as ViewKey[])
+          .map((id) => allNav.find((item) => item.id === id))
+          .filter((item): item is NavItem => Boolean(item))
+          .map((item) => (
+            <NavButton
+              key={item.id}
+              item={item}
+              active={activeView === item.id}
+              badge={badges[item.id]}
+              onClick={() => navigate(item.id)}
+            />
+          ))}
         <button
           className={mobileMenuOpen ? "active" : ""}
           onClick={() => setMobileMenuOpen(true)}
@@ -319,10 +324,12 @@ export function AppShell({
 function NavButton({
   item,
   active,
+  badge = 0,
   onClick,
 }: {
   item: NavItem;
   active: boolean;
+  badge?: number;
   onClick: () => void;
 }) {
   const Icon = item.icon;
@@ -330,6 +337,7 @@ function NavButton({
     <button className={active ? "active" : ""} onClick={onClick}>
       <Icon size={19} strokeWidth={active ? 2.4 : 2} />
       <span>{item.label}</span>
+      {badge > 0 && <i className="nav-badge">{badge}</i>}
     </button>
   );
 }

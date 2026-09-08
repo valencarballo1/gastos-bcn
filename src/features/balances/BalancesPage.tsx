@@ -12,9 +12,11 @@ import {
   Send,
 } from "lucide-react";
 import { Avatar } from "@/components/common/Avatar";
+import { AmountInput } from "@/components/common/AmountInput";
 import { Modal } from "@/components/common/Modal";
 import { PageHeader } from "@/components/common/PageHeader";
 import { errorMessage } from "@/services/api";
+import { formatAmountInput, fromCents, toCents } from "@/lib/money";
 import type {
   BalanceSummary,
   HouseholdData,
@@ -223,14 +225,18 @@ function SettlementForm({
   const members = data.members.filter((member) => member.active);
   const [fromId, setFromId] = useState(prefill?.fromMemberId ?? members[0]?.id ?? "");
   const [toId, setToId] = useState(prefill?.toMemberId ?? members[1]?.id ?? "");
-  const [amount, setAmount] = useState(prefill ? String(prefill.amount) : "");
+  const [amount, setAmount] = useState(
+    prefill ? formatAmountInput(prefill.amount) : "",
+  );
   const [method, setMethod] = useState<Settlement["method"]>("Bizum");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const amountCents = toCents(amount);
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (fromId === toId || Number(amount) <= 0) {
+    if (fromId === toId || amountCents <= 0) {
       setError("Elegí dos integrantes distintos y un importe mayor a cero.");
       return;
     }
@@ -240,7 +246,7 @@ function SettlementForm({
       await onSubmit({
         fromMemberId: fromId,
         toMemberId: toId,
-        amount: Number(amount),
+        amount: fromCents(amountCents),
         method,
         date: new Date().toISOString(),
         concept: "Liquidación de saldo",
@@ -283,15 +289,13 @@ function SettlementForm({
           </label>
           <label className="field">
             <span>Importe</span>
-            <div className="input-prefix">
+            <div className="input-prefix input-prefix-large">
               <span>€</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0.01"
+              <AmountInput
+                selectOnFocus
+                aria-label="Importe de la liquidación"
                 value={amount}
-                onChange={(event) => setAmount(event.target.value)}
+                onValueChange={setAmount}
               />
             </div>
           </label>
