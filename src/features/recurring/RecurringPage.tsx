@@ -12,9 +12,11 @@ import {
   Variable,
 } from "lucide-react";
 import { Avatar } from "@/components/common/Avatar";
+import { AmountInput } from "@/components/common/AmountInput";
 import { Modal } from "@/components/common/Modal";
 import { PageHeader } from "@/components/common/PageHeader";
 import { errorMessage } from "@/services/api";
+import { parseAmount } from "@/lib/money";
 import type { HouseholdData, RecurringExpense } from "@/types";
 import { daysUntil, formatCurrency, formatLongDate } from "@/utils/format";
 
@@ -196,7 +198,7 @@ function RecurringForm({
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!name.trim() || (!variable && Number(amount) <= 0)) {
+    if (!name.trim() || (!variable && (parseAmount(amount) ?? 0) <= 0)) {
       setError("Completá el nombre y un importe estimado.");
       return;
     }
@@ -209,7 +211,7 @@ function RecurringForm({
       await onSubmit({
         name: name.trim(),
         categoryId,
-        estimatedAmount: amount ? Number(amount) : null,
+        estimatedAmount: parseAmount(amount),
         variableAmount: variable,
         frequency: "monthly",
         dueDay: Number(dueDay),
@@ -251,14 +253,9 @@ function RecurringForm({
             <span>Importe estimado</span>
             <div className="input-prefix">
               <span>€</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                min="0"
-                placeholder="0,00"
+              <AmountInput
                 value={amount}
-                onChange={(event) => setAmount(event.target.value)}
+                onValueChange={setAmount}
               />
             </div>
           </label>

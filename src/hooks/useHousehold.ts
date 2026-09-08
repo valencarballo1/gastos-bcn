@@ -370,6 +370,31 @@ export function useHousehold(enabled: boolean, requestedHouseholdId?: string) {
         runMutation(() =>
           householdApi.expenses.create(householdId, expense),
         ),
+      updateExpense: (
+        expenseId: string,
+        expense: Omit<
+          Expense,
+          "id" | "householdId" | "createdAt" | "rowVersion"
+        > & { rowVersion?: string },
+      ) => {
+        const current = data.expenses.find((item) => item.id === expenseId);
+        return runMutation(() =>
+          householdApi.expenses.update(householdId, expenseId, {
+            ...expense,
+            rowVersion: expense.rowVersion ?? current?.rowVersion,
+          }),
+        );
+      },
+      removeExpense: (expenseId: string) => {
+        const current = data.expenses.find((item) => item.id === expenseId);
+        return runMutation(() =>
+          householdApi.expenses.cancel(
+            householdId,
+            expenseId,
+            current?.rowVersion,
+          ),
+        );
+      },
       addSettlement: (
         settlement: Omit<
           Settlement,
@@ -582,6 +607,7 @@ export function useHousehold(enabled: boolean, requestedHouseholdId?: string) {
     }),
     [
       activeList,
+      data.expenses,
       data.members,
       data.recurringExpenses,
       data.tasks,

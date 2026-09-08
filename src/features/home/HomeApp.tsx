@@ -456,7 +456,12 @@ export function HomeApp() {
         />
       )}
       {route.view === "expenses" && (
-        <ExpensesPage data={data} addExpense={actions.addExpense} />
+        <ExpensesPage
+          data={data}
+          addExpense={actions.addExpense}
+          updateExpense={actions.updateExpense}
+          removeExpense={actions.removeExpense}
+        />
       )}
       {route.view === "recurring" && (
         <RecurringPage

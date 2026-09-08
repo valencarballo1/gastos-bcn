@@ -14,12 +14,25 @@ import {
   Users,
 } from "lucide-react";
 import { Avatar } from "@/components/common/Avatar";
+import { AmountInput } from "@/components/common/AmountInput";
 import { Modal } from "@/components/common/Modal";
 import { PageHeader } from "@/components/common/PageHeader";
 import { errorMessage } from "@/services/api";
+import {
+  formatAmountInput,
+  formatQuantityInput,
+  fromCents,
+  parseAmount,
+  previewEqualSplit,
+  toCents,
+} from "@/lib/money";
 import type { HouseholdData, ShoppingItem } from "@/types";
 import { formatCurrency, formatLongDate } from "@/utils/format";
-import { openShoppingList, shoppingItemPrice } from "@/utils/shopping";
+import {
+  openShoppingList,
+  parseBulkItems,
+  shoppingItemPrice,
+} from "@/utils/shopping";
 
 interface ShoppingPageProps {
   data: HouseholdData;
@@ -323,15 +336,15 @@ function ShoppingItemPriceForm({
   onSubmit: (actualPrice: number) => Promise<unknown>;
 }) {
   const [price, setPrice] = useState(
-    item?.actualPrice != null ? String(item.actualPrice) : "",
+    item?.actualPrice != null ? formatAmountInput(item.actualPrice) : "",
   );
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    const actualPrice = Number(price);
-    if (!price || !Number.isFinite(actualPrice) || actualPrice < 0) return;
+    const actualPrice = parseAmount(price);
+    if (actualPrice === null || actualPrice < 0) return;
     setSubmitting(true);
     setError("");
     try {
@@ -353,20 +366,18 @@ function ShoppingItemPriceForm({
       <form className="app-form" onSubmit={(event) => void submit(event)}>
         <label className="field">
           <span>Precio real</span>
-          <div className="input-prefix">
+          <div className="input-prefix input-prefix-large">
             <span>€</span>
-            <input
+            <AmountInput
               autoFocus
-              required
-              type="number"
-              inputMode="decimal"
-              min="0"
-              step="0.01"
-              placeholder="0,00"
+              selectOnFocus
               value={price}
-              onChange={(event) => setPrice(event.target.value)}
+              onValueChange={setPrice}
             />
           </div>
+          <small className="field-hint">
+            Con decimales: 3,45 o 3.45, como te resulte más cómodo.
+          </small>
         </label>
         {error && <p className="form-error">{error}</p>}
         <div className="form-actions">
@@ -412,10 +423,7 @@ function ShoppingItemForm({
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const bulkNames = namesText
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const bulkItems = parseBulkItems(namesText);
   const categoryName =
     shoppingCategories.find((item) => item.id === categoryId)?.name ?? "Otros";
 
@@ -424,27 +432,27 @@ function ShoppingItemForm({
     if (submitting) return;
 
     if (mode === "bulk") {
-      if (!bulkNames.length) {
-        setError("Escribí al menos un producto, separado por comas.");
+      if (!bulkItems.length) {
+        setError("Escribí al menos un producto, separado por comas o saltos de línea.");
         return;
       }
       setSubmitting(true);
       setError("");
       try {
-        await Promise.all(
-          bulkNames.map((productName) =>
-            onSubmit({
-              name: productName,
-              quantity: 1,
-              unit: "u",
-              categoryId,
-              category: categoryName,
-              addedByMemberId: memberId,
-              priority: "normal",
-              estimatedPrice: undefined,
-            }),
-          ),
-        );
+        // En serie: la lista se crea con el primer producto y los siguientes
+        // tienen que caer en esa misma lista, no en una nueva.
+        for (const product of bulkItems) {
+          await onSubmit({
+            name: product.name,
+            quantity: product.quantity,
+            unit: "u",
+            categoryId,
+            category: categoryName,
+            addedByMemberId: memberId,
+            priority: "normal",
+            estimatedPrice: product.estimatedPrice,
+          });
+        }
         setNamesText("");
       } catch (reason) {
         setError(errorMessage(reason));
@@ -460,13 +468,13 @@ function ShoppingItemForm({
     try {
       await onSubmit({
         name: name.trim(),
-        quantity: Number(quantity),
+        quantity: parseAmount(quantity) || 1,
         unit,
         categoryId,
         category: categoryName,
         addedByMemberId: memberId,
         priority,
-        estimatedPrice: estimate ? Number(estimate) : undefined,
+        estimatedPrice: parseAmount(estimate) ?? undefined,
       });
       setName("");
     } catch (reason) {
@@ -483,7 +491,7 @@ function ShoppingItemForm({
       title="Agregar al ticket"
       subtitle={
         mode === "bulk"
-          ? "Elegí la categoría y escribí los productos separados por coma: se agregan todos con cantidad 1."
+          ? "Escribí los productos separados por coma o en líneas distintas. Entiende \u00ab2 x leche\u00bb y \u00abpan 0,90\u00bb."
           : "Aparecerá al instante en la lista conjunta."
       }
     >
@@ -517,14 +525,29 @@ function ShoppingItemForm({
           </label>
         ) : (
           <label className="field">
-            <span>Productos (separados por coma)</span>
+            <span>Productos</span>
             <textarea
               autoFocus
-              rows={3}
-              placeholder="Ej. Champú, acondicionador, jabón"
+              rows={4}
+              placeholder={"Ej. Champú, acondicionador\n2 x leche 1,20\nPan 0,90"}
               value={namesText}
               onChange={(event) => setNamesText(event.target.value)}
             />
+            {bulkItems.length > 0 && (
+              <div className="bulk-preview">
+                {bulkItems.map((product, index) => (
+                  <span key={`${product.name}-${index}`}>
+                    {product.quantity > 1
+                      ? `${formatQuantityInput(product.quantity)} × `
+                      : ""}
+                    {product.name}
+                    {product.estimatedPrice
+                      ? ` · ${formatCurrency(product.estimatedPrice)}`
+                      : ""}
+                  </span>
+                ))}
+              </div>
+            )}
           </label>
         )}
 
@@ -533,13 +556,13 @@ function ShoppingItemForm({
             <>
               <label className="field">
                 <span>Cantidad</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min="0.1"
-                  step="0.1"
+                <AmountInput
                   value={quantity}
-                  onChange={(event) => setQuantity(event.target.value)}
+                  onValueChange={setQuantity}
+                  decimals={3}
+                  formatOnBlur={false}
+                  selectOnFocus
+                  placeholder="1"
                 />
               </label>
               <label className="field">
@@ -586,14 +609,10 @@ function ShoppingItemForm({
                 <span>Precio estimado</span>
                 <div className="input-prefix">
                   <span>€</span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    min="0"
+                  <AmountInput
                     placeholder="Opcional"
                     value={estimate}
-                    onChange={(event) => setEstimate(event.target.value)}
+                    onValueChange={setEstimate}
                   />
                 </div>
               </label>
@@ -620,13 +639,13 @@ function ShoppingItemForm({
           <button
             className="button button-primary"
             type="submit"
-            disabled={submitting || (mode === "bulk" && !bulkNames.length)}
+            disabled={submitting || (mode === "bulk" && !bulkItems.length)}
           >
             {submitting
               ? "Agregando…"
               : mode === "bulk"
-                ? bulkNames.length
-                  ? `Agregar ${bulkNames.length} producto${bulkNames.length === 1 ? "" : "s"}`
+                ? bulkItems.length
+                  ? `Agregar ${bulkItems.length} producto${bulkItems.length === 1 ? "" : "s"}`
                   : "Agregar productos"
                 : "Agregar al ticket"}
           </button>
@@ -651,22 +670,31 @@ function FinishShoppingForm({
   itemCount: number;
   onSubmit: (amount: number, payerId: string) => Promise<unknown>;
 }) {
+  const activeMembers = data.members.filter((member) => member.active);
   const [amount, setAmount] = useState(
-    suggestedAmount ? suggestedAmount.toFixed(2) : "",
+    suggestedAmount ? formatAmountInput(suggestedAmount) : "",
   );
-  const [payerId, setPayerId] = useState(
-    data.members.find((member) => member.active)?.id ?? "",
-  );
+  const [payerId, setPayerId] = useState(activeMembers[0]?.id ?? "");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const totalCents = toCents(amount);
+  const share = previewEqualSplit(
+    fromCents(totalCents),
+    activeMembers.map((member) => member.id),
+  );
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (Number(amount) <= 0 || submitting) return;
+    if (submitting) return;
+    if (totalCents <= 0) {
+      setError("Cargá el total del ticket para crear el gasto.");
+      return;
+    }
     setSubmitting(true);
     setError("");
     try {
-      await onSubmit(Number(amount), payerId);
+      await onSubmit(fromCents(totalCents), payerId);
     } catch (reason) {
       setError(errorMessage(reason));
     } finally {
@@ -685,41 +713,58 @@ function FinishShoppingForm({
         className="app-form"
         onSubmit={(event) => void submit(event)}
       >
-        <label className="field">
+        <div className="amount-focus">
           <span>Total real del ticket</span>
-          <div className="input-prefix input-prefix-large">
+          <div className="amount-focus-input">
             <span>€</span>
-            <input
+            <AmountInput
               autoFocus
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              min="0.01"
+              selectOnFocus
+              aria-label="Total del ticket"
               value={amount}
-              onChange={(event) => setAmount(event.target.value)}
+              onValueChange={setAmount}
             />
           </div>
-        </label>
-        <label className="field">
-          <span>¿Quién pagó?</span>
-          <select
-            value={payerId}
-            onChange={(event) => setPayerId(event.target.value)}
-          >
-            {data.members
-              .filter((member) => member.active)
-              .map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.name}
-                </option>
-              ))}
-          </select>
-        </label>
-        <div className="conversion-note">
-          <Users size={20} />
+          <small>
+            {suggestedAmount > 0
+              ? `Los precios cargados suman ${formatCurrency(suggestedAmount)}. Ajustá con el total del ticket.`
+              : "Escribí el total con decimales: 42,17"}
+          </small>
+        </div>
+        <fieldset className="form-section">
+          <legend>¿Quién pagó?</legend>
+          <div className="payer-row">
+            {activeMembers.map((member) => (
+              <button
+                type="button"
+                key={member.id}
+                className={`payer-option ${payerId === member.id ? "active" : ""}`}
+                onClick={() => setPayerId(member.id)}
+              >
+                <Avatar member={member} size="sm" />
+                <span>{member.name}</span>
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <div className="split-summary">
+          <Users size={18} />
           <p>
-            <strong>Se dividirá entre los integrantes activos.</strong>
-            <span>El backend permitirá ajustar el reparto antes de confirmar.</span>
+            {totalCents > 0 ? (
+              <>
+                Se reparte en partes iguales:{" "}
+                {share
+                  .map((item) => {
+                    const member = activeMembers.find(
+                      (candidate) => candidate.id === item.memberId,
+                    );
+                    return `${member?.name ?? "—"} ${formatCurrency(item.amount)}`;
+                  })
+                  .join(" · ")}
+              </>
+            ) : (
+              <>Se dividirá en partes iguales entre los integrantes activos.</>
+            )}
           </p>
         </div>
         {error && <p className="form-error">{error}</p>}
